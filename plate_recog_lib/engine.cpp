@@ -1,11 +1,13 @@
 #include "engine.h"
+#include <opencv2/opencv.hpp>
 #include <assert.h>
 
 using namespace cv;
 using namespace std;
 
-void add_and_show( const cv::Mat& m );
-void debug_out( const std::string& text );
+void add_and_show( const cv::Mat& m ) {}
+void debug_out( const std::string& text ) {}
+std::vector< std::pair< std::string, int > > read_number( const cv::Mat& image, int grey_level );
 
 typedef std::pair< int, int > std_pair_int;
 
