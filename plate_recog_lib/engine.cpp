@@ -878,7 +878,7 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 	return -1;
 }
 
-std::string read_number_loop( const cv::Mat& image, int level, map< int, pair< string, int > >& found_nums )
+std::pair< std::string, int > read_number_loop( const cv::Mat& image, int level, map< int, pair< string, int > >& found_nums )
 {
 	(void)level;
 	int next_level = find_next_level( found_nums );
@@ -893,10 +893,10 @@ std::string read_number_loop( const cv::Mat& image, int level, map< int, pair< s
 
 	const int best_level = fine_best_level( found_nums );
 	assert( best_level != -1 );
-	return found_nums[ best_level ].first;
+	return found_nums[ best_level ];
 }
 
-std::string read_number( const cv::Mat& image )
+std::pair< std::string, int > read_number( const cv::Mat& image )
 {
 	map< int, pair< string, int > > found_nums;
 	found_nums[ 127 ] = make_pair( string(), -1 );
@@ -944,7 +944,7 @@ std::string read_number( const cv::Mat& image )
 			return read_number_loop( image, first_search_levels.at( nn ), found_nums );
 		}
 	}
-	return std::string( "" );
+	return make_pair( std::string( "" ), 0 );
 }
 
 std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, int grey_level )

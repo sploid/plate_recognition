@@ -11,12 +11,13 @@
 void process_file( const std::string& folder_name, const std::string& file_name )
 {
 	using namespace std;
-	cout << "process file: " << file_name.substr( folder_name.size() + 1, file_name.size() - folder_name.size() ) << endl;
-	cv::Mat image = cv::imread( file_name.c_str(), CV_LOAD_IMAGE_COLOR);   // Read the file
+	cout << file_name.substr( folder_name.size() + 1, file_name.size() - folder_name.size() ) << "   ";
+	const cv::Mat image = cv::imread( file_name.c_str(), CV_LOAD_IMAGE_COLOR);   // Read the file
 	if( image.data )
 	{
-		const string number = read_number( image );
-		cout << "number: " << number << endl;
+		const int64 begin = cv::getTickCount();
+		const pair< string, int > number = read_number( image );
+		cout << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
 	}
 	else
 	{
@@ -33,6 +34,7 @@ int main( int argc, char** argv )
 		return 1;
 	}
 	const string image_folder( argv[ 1 ] );
+	cout << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
 	// грузим список картинок
 #ifdef WIN32
 	WIN32_FIND_DATA find_file_data;

@@ -9,4 +9,4 @@ namespace cv
 	class Mat;
 }
 
-std::string PLATE_RECOG_EXPORT read_number( const cv::Mat& image );
+std::pair< std::string, int > PLATE_RECOG_EXPORT read_number( const cv::Mat& image );
