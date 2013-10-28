@@ -13,7 +13,6 @@ std::vector< std::vector< float > > std_sym9();
 std::vector< std::vector< float > > std_symA();
 std::vector< std::vector< float > > std_symB();
 std::vector< std::vector< float > > std_symC();
-std::vector< std::vector< float > > std_symD();
 std::vector< std::vector< float > > std_symE();
 std::vector< std::vector< float > > std_symH();
 std::vector< std::vector< float > > std_symK();

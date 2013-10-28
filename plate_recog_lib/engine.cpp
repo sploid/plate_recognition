@@ -255,7 +255,6 @@ pair< char, double > std_find_sym( bool num, const std_figure* fig, const cv::Ma
 		let_syms.push_back( std_symA() );
 		let_syms.push_back( std_symB() );
 		let_syms.push_back( std_symC() );
-		let_syms.push_back( std_symD() );
 		let_syms.push_back( std_symE() );
 		let_syms.push_back( std_symH() );
 		let_syms.push_back( std_symK() );
@@ -331,16 +330,15 @@ pair< char, double > std_find_sym( bool num, const std_figure* fig, const cv::Ma
 		case 0: ret = make_pair( 'A', max_sum ); break;
 		case 1: ret = make_pair( 'B', max_sum ); break;
 		case 2: ret = make_pair( 'C', max_sum ); break;
-		case 3: ret = make_pair( 'D', max_sum ); break;
-		case 4: ret = make_pair( 'E', max_sum ); break;
-		case 5: ret = make_pair( 'H', max_sum ); break;
-		case 6: ret = make_pair( 'K', max_sum ); break;
-		case 7: ret = make_pair( 'M', max_sum ); break;
-		case 8: ret = make_pair( 'O', max_sum ); break;
-		case 9: ret = make_pair( 'P', max_sum ); break;
-		case 10: ret = make_pair( 'T', max_sum ); break;
-		case 11: ret = make_pair( 'X', max_sum ); break;
-		case 12: ret = make_pair( 'Y', max_sum ); break;
+		case 3: ret = make_pair( 'E', max_sum ); break;
+		case 4: ret = make_pair( 'H', max_sum ); break;
+		case 5: ret = make_pair( 'K', max_sum ); break;
+		case 6: ret = make_pair( 'M', max_sum ); break;
+		case 7: ret = make_pair( 'O', max_sum ); break;
+		case 8: ret = make_pair( 'P', max_sum ); break;
+		case 9: ret = make_pair( 'T', max_sum ); break;
+		case 10: ret = make_pair( 'X', max_sum ); break;
+		case 11: ret = make_pair( 'Y', max_sum ); break;
 		default: ret = make_pair( (char)0, max_sum ); break;
 		}
 	}
