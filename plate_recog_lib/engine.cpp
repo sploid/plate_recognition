@@ -5,9 +5,7 @@
 using namespace cv;
 using namespace std;
 
-void add_and_show( const cv::Mat& m ) {}
-void debug_out( const std::string& text ) {}
-std::vector< std::pair< std::string, int > > read_number( const cv::Mat& image, int grey_level );
+std::vector< std::pair< std::string, int > > read_number( const cv::Mat& image, int grey_level, recog_debug_callback *recog_debug );
 
 typedef std::pair< int, int > std_pair_int;
 
@@ -438,8 +436,9 @@ std::set< T > to_set( const std::vector< T >& in )
 }
 
 
-std::vector< std::pair< string, int > > procces_found_figs( vector< std_figure > figs, cv::Mat& etal )
+std::vector< std::pair< string, int > > procces_found_figs( vector< std_figure > figs, cv::Mat& etal, recog_debug_callback *recog_debug )
 {
+	(void)recog_debug;
 	vector< pair< string, int > > ret;
 	sort( figs.begin(), figs.end(), std_less_left_ref );
 	// бьем по группам
@@ -660,7 +659,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< std_figure >
 						pis[ kk ] = pis[ kk ] + cen + cur_fig->top_left();
 //						cv::circle( colored_gr, Point( pis[ kk ].first, pis[ kk ].second ), 1, CV_RGB( 255, 0, 0 ) );
 					}
-//					add_and_show( colored_gr );
+//					recog_debug->out_image( colored_gr );
 					set< const std_figure* > procs_figs;
 					vector< pair< pair< const std_figure*, int >, pair< char, double > > > figs_by_pos;
 					for ( size_t kk = 0; kk < pis.size(); ++kk )
@@ -741,7 +740,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< std_figure >
 				ret.push_back( fig_nums_sums.at( best_index ) );
 				stringstream out;
 				out << "next figure: " << fig_nums_sums.at( best_index ).first << " " << fig_nums_sums.at( best_index ).second;
-				debug_out( out.str() );
+				recog_debug->out_string( out.str() );
 /*			}
 			else
 			{
@@ -750,7 +749,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< std_figure >
 		}
 		else
 		{
-			debug_out( "not found number in group" );
+			recog_debug->out_string( "not found number in group" );
 		}
 	}
 
@@ -766,7 +765,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< std_figure >
 			const std_figure* cur_fig = groups.at( nn ).at( mm );
 			cv::rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
-		add_and_show( colored_rect );
+		recog_debug->out_image( colored_rect );
 	}*/
 	return ret;
 }
@@ -878,13 +877,12 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 	return -1;
 }
 
-std::pair< std::string, int > read_number_loop( const cv::Mat& image, int level, map< int, pair< string, int > >& found_nums )
+std::pair< std::string, int > read_number_loop( const cv::Mat& image, map< int, pair< string, int > >& found_nums, recog_debug_callback *recog_debug )
 {
-	(void)level;
 	int next_level = find_next_level( found_nums );
 	while ( next_level != -1 )
 	{
-		const vector< pair< string, int > > cur_nums = read_number( image, next_level );
+		const vector< pair< string, int > > cur_nums = read_number( image, next_level, recog_debug );
 		const pair< string, int > best_num = find_best( cur_nums );
 		found_nums[ next_level ] = best_num;
 
@@ -896,8 +894,9 @@ std::pair< std::string, int > read_number_loop( const cv::Mat& image, int level,
 	return found_nums[ best_level ];
 }
 
-std::pair< std::string, int > read_number( const cv::Mat& image )
+std::pair< std::string, int > read_number( const cv::Mat& image, recog_debug_callback *recog_debug )
 {
+	assert( recog_debug );
 	map< int, pair< string, int > > found_nums;
 	found_nums[ 127 ] = make_pair( string(), -1 );
 	found_nums[ 63  ] = make_pair( string(), -1 );
@@ -932,101 +931,103 @@ std::pair< std::string, int > read_number( const cv::Mat& image )
 	first_search_levels.push_back( 175 );
 	first_search_levels.push_back( 207 );
 	first_search_levels.push_back( 239 );
-//	int nn = 100;
-//	for ( int nn = 30; nn < 60; nn += 10 )
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
 	{
-		const vector< pair< string, int > > cur_nums = read_number( image, first_search_levels.at( nn ) );
+		const vector< pair< string, int > > cur_nums = read_number( image, first_search_levels.at( nn ), recog_debug );
 		const pair< string, int > best_num = find_best( cur_nums );
 		found_nums[ first_search_levels.at( nn ) ] = best_num;
 		if ( best_num.second != 0 )
 		{
-			return read_number_loop( image, first_search_levels.at( nn ), found_nums );
+			return read_number_loop( image, found_nums, recog_debug );
 		}
 	}
 	return make_pair( std::string( "" ), 0 );
 }
 
-std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, int grey_level )
+std::pair< std::string, int > read_number_by_level( const cv::Mat& image, int gray_level, recog_debug_callback *recog_debug )
+{
+	return find_best( read_number( image, gray_level, recog_debug ) );
+}
+
+std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, int grey_level, recog_debug_callback *recog_debug )
 {
 	Mat gray( input.size(), CV_8U );
 	cvtColor( input, gray, CV_RGB2GRAY );
-//	add_and_show( gray );
+//	recog_debug->out_image( gray );
 	Mat img_bw = gray > grey_level;
-//	add_and_show( img_bw );
+//	recog_debug->out_image( img_bw );
 /*		// вырезаем одиночные пиксели (пока не нужно)
-		for ( int nn = 0; nn < img_bw.rows; ++nn )
+	for ( int nn = 0; nn < img_bw.rows; ++nn )
+	{
+		for ( int mm = 0; mm < img_bw.cols - 2; ++mm )
 		{
-			for ( int mm = 0; mm < img_bw.cols - 2; ++mm )
+			unsigned char c1 = img_bw.at< unsigned char >( nn, mm );
+			unsigned char c2 = img_bw.at< unsigned char >( nn, mm + 1 );
+			unsigned char c3 = img_bw.at< unsigned char >( nn, mm + 2 );
+			if ( c1 == c3 && c2 != c1 )
 			{
-				unsigned char c1 = img_bw.at< unsigned char >( nn, mm );
-				unsigned char c2 = img_bw.at< unsigned char >( nn, mm + 1 );
-				unsigned char c3 = img_bw.at< unsigned char >( nn, mm + 2 );
-				if ( c1 == c3 && c2 != c1 )
-				{
-					img_bw.at< unsigned char >( nn, mm + 1 ) = c1;
-				}
+				img_bw.at< unsigned char >( nn, mm + 1 ) = c1;
 			}
 		}
-		for ( int nn = 0; nn < img_bw.cols; ++nn )
+	}
+	for ( int nn = 0; nn < img_bw.cols; ++nn )
+	{
+		for ( int mm = 0; mm < img_bw.rows - 2; ++mm )
 		{
-			for ( int mm = 0; mm < img_bw.rows - 2; ++mm )
+			unsigned char c1 = img_bw.at< unsigned char >( mm, nn );
+			unsigned char c2 = img_bw.at< unsigned char >( mm + 1, nn );
+			unsigned char c3 = img_bw.at< unsigned char >( mm + 2, nn );
+			if ( c1 == c3 && c2 != c1 )
 			{
-				unsigned char c1 = img_bw.at< unsigned char >( mm, nn );
-				unsigned char c2 = img_bw.at< unsigned char >( mm + 1, nn );
-				unsigned char c3 = img_bw.at< unsigned char >( mm + 2, nn );
-				if ( c1 == c3 && c2 != c1 )
-				{
-					img_bw.at< unsigned char >( mm + 1, nn ) = c1;
-				}
+				img_bw.at< unsigned char >( mm + 1, nn ) = c1;
 			}
 		}
-		add_and_show( img_bw );*/
-		cv::Mat img_to_rez = img_bw.clone();
-//		cv::Mat img_to_proc = img_bw.clone();
-		vector< std_figure > figs;
-		figs.reserve( 1000 );
-		//надо увеличить скорость разбития картинки на фигуры
-		// бьем картинку на фигуры
-		for ( int nn = 0; nn < img_bw.rows; ++nn )
+	}
+	recog_debug->out_image( img_bw );*/
+	cv::Mat img_to_rez = img_bw.clone();
+	vector< std_figure > figs;
+	figs.reserve( 1000 );
+	//надо увеличить скорость разбития картинки на фигуры
+	// бьем картинку на фигуры
+	for ( int nn = 0; nn < img_bw.rows; ++nn )
+	{
+		for ( int mm = 0; mm < img_bw.cols; ++mm )
 		{
-			for ( int mm = 0; mm < img_bw.cols; ++mm )
+			if ( img_bw.at< unsigned char >( nn, mm ) == 0 )
 			{
-				if ( img_bw.at< unsigned char >( nn, mm ) == 0 )
+				std_figure fig_to_create;
+				add_pixel_as_spy( nn, mm, img_bw, fig_to_create );
+				if ( fig_to_create.is_valid() )
 				{
-					std_figure fig_to_create;
-					add_pixel_as_spy( nn, mm, img_bw, fig_to_create );
-					if ( fig_to_create.is_valid() )
+					// проверяем что высота больше ширины
+					if ( fig_to_create.width() < fig_to_create.height() )
 					{
-						// проверяем что высота больше ширины
-						if ( fig_to_create.width() < fig_to_create.height() )
+						if ( fig_to_create.width() > 4 )
 						{
-							if ( fig_to_create.width() > 4 )
+							if ( fig_to_create.height() / fig_to_create.width() < 4 )
 							{
-								if ( fig_to_create.height() / fig_to_create.width() < 4 )
-								{
-									figs.push_back( fig_to_create );
-								}
+								figs.push_back( fig_to_create );
 							}
 						}
 					}
 				}
 			}
 		}
-		// отрисовываем найденные фигуры
-/*		if ( !figs.empty() )
+	}
+	// отрисовываем найденные фигуры
+	if ( !figs.empty() )
+	{
+		Mat colored_rect_1( input.size(), CV_8UC3 );
+		Mat colored_rect_2( input.size(), CV_8UC3 );
+		cvtColor( img_to_rez, colored_rect_1, CV_GRAY2RGB );
+		cvtColor( img_bw, colored_rect_2, CV_GRAY2RGB );
+		for ( size_t nn = 0; nn < figs.size(); ++nn )
 		{
-			Mat colored_rect_1( input.size(), CV_8UC3 );
-			Mat colored_rect_2( input.size(), CV_8UC3 );
-			cvtColor( img_to_rez, colored_rect_1, CV_GRAY2RGB );
-			cvtColor( img_bw, colored_rect_2, CV_GRAY2RGB );
-			for ( int nn = 0; nn < figs.size(); ++nn )
-			{
-				cv::rectangle( colored_rect_1, Point( figs[ nn ].left(), figs[ nn ].top() ), Point( figs[ nn ].right(), figs[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
-				cv::rectangle( colored_rect_2, Point( figs[ nn ].left(), figs[ nn ].top() ), Point( figs[ nn ].right(), figs[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
-			}
-//			add_and_show( colored_rect_2 );
-//			add_and_show( colored_rect_1 );
-		}*/
-		return procces_found_figs( figs, img_to_rez );
+			cv::rectangle( colored_rect_1, Point( figs[ nn ].left(), figs[ nn ].top() ), Point( figs[ nn ].right(), figs[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
+			cv::rectangle( colored_rect_2, Point( figs[ nn ].left(), figs[ nn ].top() ), Point( figs[ nn ].right(), figs[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
+		}
+		recog_debug->out_image( colored_rect_2 );
+		recog_debug->out_image( colored_rect_1 );
+	}
+	return procces_found_figs( figs, img_to_rez, recog_debug );
 }

@@ -8,6 +8,12 @@
 #include <windows.h>
 #endif
 
+struct debug_out : public recog_debug_callback
+{
+	virtual void out_image( const cv::Mat& ) { }
+	virtual void out_string( const std::string& ) { }
+};
+
 void process_file( const std::string& folder_name, const std::string& file_name )
 {
 	using namespace std;
@@ -16,7 +22,8 @@ void process_file( const std::string& folder_name, const std::string& file_name 
 	if( image.data )
 	{
 		const int64 begin = cv::getTickCount();
-		const pair< string, int > number = read_number( image );
+		debug_out rc;
+		const pair< string, int > number = read_number( image, &rc );
 		cout << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
 	}
 	else
