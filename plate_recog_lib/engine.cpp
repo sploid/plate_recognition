@@ -1,14 +1,14 @@
 #include "engine.h"
 #include <opencv2/opencv.hpp>
 #include <assert.h>
+#include "syms.h"
 
 using namespace cv;
 using namespace std;
 
-std::vector< std::pair< std::string, int > > read_number( const cv::Mat& image, int grey_level, recog_debug_callback *recog_debug );
+std::vector< std::pair< std::string, int > > read_number_impl( const cv::Mat& image, int grey_level, recog_debug_callback *recog_debug );
 
 typedef std::pair< int, int > std_pair_int;
-
 
 inline std_pair_int operator-( const std_pair_int& lh, const std_pair_int& rh )
 {
@@ -59,8 +59,22 @@ vector< std_pair_int > std_calc_centers( int index, float move_koef )
 	return ret;
 }
 
-// надо сделать какую-то пропорцию для зависимости угла от расстояния
-bool std_angle_is_equal( int an1, int an2 )
+std::pair< std::string, int > find_best_number_by_weight( const std::vector< std::pair< std::string, int > >& vals )
+{
+	int best_index = -1;
+	for ( size_t nn = 0; nn < vals.size(); ++nn )
+	{
+		if ( best_index == -1
+			|| vals[ best_index ].second < vals[ nn ].second )
+		{
+			best_index = nn;
+		}
+	}
+	return best_index == -1 ? std::make_pair( std::string(), 0 ) : vals[ best_index ];
+}
+
+// РЅР°РґРѕ СЃРґРµР»Р°С‚СЊ РєР°РєСѓСЋ-С‚Рѕ РїСЂРѕРїРѕСЂС†РёСЋ РґР»СЏ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё СѓРіР»Р° РѕС‚ СЂР°СЃСЃС‚РѕСЏРЅРёСЏ
+bool angle_is_equal( int an1, int an2 )
 {
 	const int angle_diff = 16;
 	int an_max = an1 + angle_diff;
@@ -177,7 +191,8 @@ private:
 //	set< std_pair_int > m_points;
 };
 
-#include "syms.h"
+typedef map< pair< bool, const figure* >, pair< char, double > > clacs_figs_type;
+clacs_figs_type calcs_figs;
 
 double std_calc_sym( const cv::Mat& cur_mat, const vector< vector< float > >& sym )
 {
@@ -196,24 +211,24 @@ double std_calc_sym( const cv::Mat& cur_mat, const vector< vector< float > >& sy
 				koef = -1.;
 			if ( koef > 0 )
 				koef = 1.;*/
-//			комбинированный
+//			РєРѕРјР±РёРЅРёСЂРѕРІР°РЅРЅС‹Р№
 			//qreal val = 0.;
 			//if ( koef < 0 )
 			//{
 			//	koef = -1.;
-			//	// должно быть белым
+			//	// РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РµР»С‹Рј
 			//	val = dest_mat.at< quint8 >( yy, xx );
 			//}
 			//else
 			//{
-			//	// должно быть черным
+			//	// РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С‡РµСЂРЅС‹Рј
 			//	val = 255 - dest_mat. at< quint8 >( yy, xx );
 			//}
 			//sum += koef * val;
-//			по белому
+//			РїРѕ Р±РµР»РѕРјСѓ
 //			qreal val = dest_mat. at< quint8 >( yy, xx );
 //			sum += -1. * val * koef;
-//			по черному
+//			РїРѕ С‡РµСЂРЅРѕРјСѓ
 			double val = 255 - dest_mat. at< unsigned char >( yy, xx );
 			sum += val * koef;
 		}
@@ -221,11 +236,8 @@ double std_calc_sym( const cv::Mat& cur_mat, const vector< vector< float > >& sy
 	return sum;
 }
 
-
 pair< char, double > std_find_sym( bool num, const figure* fig, const cv::Mat& etal )
 {
-	typedef map< pair< bool, const figure* >, pair< char, double > > clacs_figs_type;
-	static clacs_figs_type calcs_figs;
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
 	{
@@ -264,7 +276,7 @@ pair< char, double > std_find_sym( bool num, const figure* fig, const cv::Mat& e
 		let_syms.push_back( std_symY() );
 	}
 	vector< sym_def > * cur_syms = num ? &num_syms : &let_syms;
-	// подсчитываем кол-во
+	// РїРѕРґСЃС‡РёС‚С‹РІР°РµРј РєРѕР»-РІРѕ
 	float min_sum_full_syms = 0;
 	vector< float > sums_syms_elements;
 	for ( size_t nn = 0; nn < cur_syms->size(); ++nn )
@@ -368,7 +380,7 @@ void add_pixel_as_spy( int nn, int mm, cv::Mat& mat, figure& fig )
 	fig.add_point( std_pair_int( nn, mm ) );
 	points_dublicate.clear();
 	points_dublicate.push_back( make_pair( nn, mm ) );
-	// что бы не зациклилось
+	// С‡С‚Рѕ Р±С‹ РЅРµ Р·Р°С†РёРєР»РёР»РѕСЃСЊ
 	mat.at< unsigned char >( nn, mm ) = 255;
 	size_t cur_index = 0;
 	while ( cur_index < points_dublicate.size() )
@@ -389,7 +401,7 @@ void add_pixel_as_spy( int nn, int mm, cv::Mat& mat, figure& fig )
 					{
 						points_dublicate.push_back( make_pair( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
 						fig.add_point( make_pair( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
-						// что бы не зациклилось
+						// С‡С‚Рѕ Р±С‹ РЅРµ Р·Р°С†РёРєР»РёР»РѕСЃСЊ
 						mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) = 255;
 					}
 				}
@@ -399,14 +411,14 @@ void add_pixel_as_spy( int nn, int mm, cv::Mat& mat, figure& fig )
 	}
 }
 
-bool std_less_left( const figure* lf, const figure* rf )
+bool fig_less_left( const figure* lf, const figure* rf )
 {
 	return lf->left() < rf->left();
 }
 
 bool std_less_left_ref( const figure& lf, const figure& rf )
 {
-	return std_less_left( &lf, &rf );
+	return fig_less_left( &lf, &rf );
 }
 
 typedef vector< const figure* > figure_group;
@@ -435,78 +447,88 @@ std::set< T > to_set( const std::vector< T >& in )
 	return out;
 }
 
-
-std::vector< std::pair< string, int > > procces_found_figs( vector< figure > figs, cv::Mat& etal, recog_debug_callback *recog_debug )
+// Р’С‹РєРёРґС‹РІР°РµРј РіСЂСѓРїРїС‹, РєРѕС‚РѕСЂС‹Рµ РІРєР»СЋС‡Р°СЋС‚ РІ СЃРµР±СЏ РґСЂСѓРіРёРµ РіСЂСѓРїРїС‹
+void groups_remove_included( vector< figure_group > & groups )
 {
-	(void)recog_debug;
-	vector< pair< string, int > > ret;
-	sort( figs.begin(), figs.end(), std_less_left_ref );
-	// бьем по группам
-	vector< figure_group > groups;
-	for ( size_t nn = 0; nn < figs.size(); ++nn )
+	// todo: РїРµСЂРµРїРёСЃР°С‚СЊ РїРѕСЃС‚РѕСЏРЅРЅРѕРµ СЃРѕР·РґР°РЅРёРµ QSet
+	bool merge_was = true;
+	while ( merge_was )
 	{
-		vector< pair< double, figure_group > > cur_fig_groups;
-		// todo: тут возможно стоит идти только от nn + 1, т.к. фигуры отсортированы и идем только вправо
-		for ( size_t mm = 0; mm < figs.size(); ++mm )
+		merge_was = false;
+		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
 		{
-			if ( mm != nn )
+			const set< const figure* > s_cur_f = to_set( groups[ nn ] );
+			for ( size_t mm = 0; mm < groups.size() && !merge_was; mm++ )
 			{
-				if ( figs[ mm ].left() > figs[ nn ].left() )
+				if ( nn != mm )
 				{
-					const double angle = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - figs[ nn ].left() ), static_cast< double >( figs[ mm ].bottom() - figs[ nn ].bottom() ) );
-					bool found = false;
-					for ( size_t kk = 0; kk < cur_fig_groups.size(); ++kk )
+					const set< const figure* > s_test_f = to_set( groups[ mm ] );
+					if ( std::includes( s_cur_f.begin(), s_cur_f.end(), s_test_f.begin(), s_test_f.end() ) )
 					{
-						// проверяем что попадает в группу
-						if ( std_angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle ) ) )
-						{
-							bool ok = true;
-							// проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
-							for ( size_t yy = 1; yy < cur_fig_groups[ kk ].second.size(); ++yy )
-							{
-								const figure * next_fig = cur_fig_groups[ kk ].second.at( yy );
-								const double angle_to_fig = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - next_fig->left() ), static_cast< double >( figs[ mm ].bottom() - next_fig->bottom() ) );
-								if ( !std_angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle_to_fig ) ) )
-								{
-									ok = false;
-									break;
-								}
-							}
-							if ( ok )
-							{
-								cur_fig_groups[ kk ].second.push_back( &figs[ mm ] );
-								found = true;
-								break;
-							}
-						}
-					}
-					// создаем группу
-					if ( !found )
-					{
-						figure_group to_add;
-						to_add.push_back( &figs[ nn ] );
-						to_add.push_back( &figs[ mm ] );
-						cur_fig_groups.push_back( make_pair( angle, to_add ) );
+						// РЅР°С€Р»Рё СЃРѕРІРїР°РґРµРЅРёРµ
+						groups.erase( groups.begin() + mm );
+						merge_was = true;
+						break;
 					}
 				}
 			}
 		}
-		// проверяем что бы элементов в группе было больше 3-х
-		for ( size_t mm = 0; mm < cur_fig_groups.size(); ++mm )
+	}
+}
+
+// СЃР»РёРІР°РµРј РїРµСЂРµСЃРµРєР°СЋС‰РёРµСЃСЏ РіСЂСѓРїРїС‹
+void groups_merge_intersects( vector< figure_group > & groups )
+{
+	bool merge_was = true;
+	while ( merge_was )
+	{
+		merge_was = false;
+		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
 		{
-			if ( cur_fig_groups[ mm ].second.size() >= 3 )
+			const set< const figure* > s_cur_f = to_set( groups[ nn ] );
+			for ( size_t mm = 0; mm < groups.size() && !merge_was; ++mm )
 			{
-				groups.push_back( cur_fig_groups[ mm ].second );
+				if ( nn != mm )
+				{
+					set< const figure* > s_test_f = to_set( groups[ mm ] );
+					if ( find_first_of( s_test_f.begin(), s_test_f.end(), s_cur_f.begin(), s_cur_f.end() ) != s_test_f.end() )
+					{
+						// РЅР°С€Р»Рё РїРµСЂРµСЃРµС‡РµРЅРёРµ
+						set< const figure* > ss_nn = to_set( groups[ nn ] );
+						const set< const figure* > ss_mm = to_set( groups[ mm ] );
+						ss_nn.insert( ss_mm.begin(), ss_mm.end() );
+						vector< const figure* > res;
+						for ( set< const figure* >::const_iterator it = ss_nn.begin();
+							it != ss_nn.end(); ++it )
+						{
+							res.push_back( *it );
+						}
+						groups[ nn ] = res;
+						groups.erase( groups.begin() + mm );
+						merge_was = true;
+						break;
+					}
+				}
 			}
 		}
 	}
-	// сортируем фигуры в группах
-	for ( size_t nn = 0; nn < groups.size(); ++nn )
+}
+
+void groups_remove_to_small( vector< figure_group > & groups )
+{
+	for ( int nn = groups.size() - 1; nn >= 0; --nn )
 	{
-		sort( groups[ nn ].begin(), groups[ nn ].end(), std_less_left );
+		if ( groups[ nn ].size() < 3 )
+		{
+			groups.erase( groups.begin() + nn );
+		}
 	}
-	// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
-	// todo: !!!!!!!!!!!!!если номер будет наклонным, то ширина будет не пропорциональная высоте (надо вводить косинусь угла наклона)!!!!!!!!!!!!!!!!!!!
+}
+
+// РІС‹РєРёРґС‹РІР°РµРј СЌР»РµРјРµРЅС‚С‹, С‡С‚Рѕ РІС‹С…РѕРґСЏС‚ Р·Р° СЂР°Р·РјРµСЂС‹ РЅРѕРјРµСЂР°, РїСЂРµРґРїРѕР»РѕРіР°РµРј С‡С‚Рѕ РЅРѕРјРµСЂ РЅРµ С€РёСЂРµ 7 * С€РёСЂРёРЅР° РїРµСЂРІРѕРіРѕ СЌР»РµРјРµРЅС‚Р°
+void remote_too_long_figs_from_first( vector< figure_group > & groups )
+{
+	// todo: !!!!!!!!!!!!!РµСЃР»Рё РЅРѕРјРµСЂ Р±СѓРґРµС‚ РЅР°РєР»РѕРЅРЅС‹Рј, С‚Рѕ С€РёСЂРёРЅР° Р±СѓРґРµС‚ РЅРµ РїСЂРѕРїРѕСЂС†РёРѕРЅР°Р»СЊРЅР°СЏ РІС‹СЃРѕС‚Рµ (РЅР°РґРѕ РІРІРѕРґРёС‚СЊ РєРѕСЃРёРЅСѓСЃСЊ СѓРіР»Р° РЅР°РєР»РѕРЅР°)!!!!!!!!!!!!!!!!!!!
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		if ( groups[ nn ].size() > 2 )
@@ -528,126 +550,132 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 			}
 		}
 	}
-	// выкидываем группы, где меньше 3-х элементов
-	for ( int nn = groups.size() - 1; nn >= 0; --nn )
-	{
-		if ( groups[ nn ].size() < 3 )
-		{
-			groups.erase( groups.begin() + nn );
-		}
-	}
+}
 
-	// выкидываем элементы, не пропорциональные первому элементу
+void figs_remove_invalid_from_first_by_size( vector< figure_group > & groups )
+{
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
-		if ( groups[ nn ].size() > 2 )
+		assert( groups[ nn ].size() > 2 );
+		const figure* first_fig = groups[ nn ][ 0 ];
+		const double width_first = first_fig->right() - first_fig->left();
+		const double height_first = first_fig->bottom() - first_fig->top();
+		assert( width_first > 0. );
+		for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
 		{
-			const figure* first_fig = groups[ nn ][ 0 ];
-			const double width_first = first_fig->right() - first_fig->left();
-			const double height_first = first_fig->bottom() - first_fig->top();
-			assert( width_first > 0. );
-			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
+			const figure* cur_fig = groups[ nn ][ mm ];
+			const double width_cur = cur_fig->right() - cur_fig->left();
+			const double height_cur = first_fig->bottom() - first_fig->top();
+			if ( width_cur > width_first * 1.5 || width_cur < width_first * 0.6
+				|| height_cur > height_first * 1.5 || height_cur < height_first * 0.6 )
 			{
-				const figure* cur_fig = groups[ nn ][ mm ];
-				const double width_cur = cur_fig->right() - cur_fig->left();
-				const double height_cur = first_fig->bottom() - first_fig->top();
-				if ( width_cur > width_first * 1.5 || width_cur < width_first * 0.6
-					|| height_cur > height_first * 1.5 || height_cur < height_first * 0.6 )
-				{
-					groups[ nn ].erase( groups[ nn ].begin() + mm );
-				}
+				groups[ nn ].erase( groups[ nn ].begin() + mm );
 			}
 		}
 	}
-	// выкидываем группы, где меньше 3-х элементов
-	for ( int nn = groups.size() - 1; nn >= 0; --nn )
-	{
-		if ( groups[ nn ].size() < 3 )
-		{
-			groups.erase( groups.begin() + nn );
-		}
-	}
+}
 
-	// мерджим группы
-	// todo: переписать постоянное создание QSet
-	bool merge_was = true;
-	while ( merge_was )
+std::vector< std::pair< string, int > > procces_found_figs( vector< figure > figs, cv::Mat& etal, recog_debug_callback *recog_debug )
+{
+	(void)recog_debug;
+	vector< pair< string, int > > ret;
+	sort( figs.begin(), figs.end(), std_less_left_ref );
+	// Р±СЊРµРј РїРѕ РіСЂСѓРїРїР°Рј РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ СѓРіР»Р° РЅР°РєР»РѕРЅР° СЌР»РµРјРµРЅС‚РѕРІ РѕС‚РЅРѕСЃС‚РёС‚РµР»СЊРЅРѕ РґСЂСѓРі РґСЂСѓРіР°
+	vector< figure_group > groups;
+	for ( size_t nn = 0; nn < figs.size(); ++nn )
 	{
-		merge_was = false;
-		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
+		vector< pair< double, figure_group > > cur_fig_groups;
+		// todo: С‚СѓС‚ РІРѕР·РјРѕР¶РЅРѕ СЃС‚РѕРёС‚ РёРґС‚Рё С‚РѕР»СЊРєРѕ РѕС‚ nn + 1, С‚.Рє. С„РёРіСѓСЂС‹ РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅС‹ Рё РёРґРµРј С‚РѕР»СЊРєРѕ РІРїСЂР°РІРѕ
+		for ( size_t mm = 0; mm < figs.size(); ++mm )
 		{
-			const set< const figure* > s_cur_f = to_set( groups[ nn ] );
-			for ( size_t mm = 0; mm < groups.size() && !merge_was; mm++ )
+			if ( mm != nn )
 			{
-				if ( nn != mm )
+				if ( figs[ mm ].left() > figs[ nn ].left() )
 				{
-					const set< const figure* > s_test_f = to_set( groups[ mm ] );
-					if ( std::includes( s_cur_f.begin(), s_cur_f.end(), s_test_f.begin(), s_test_f.end() ) )
+					const double angle = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - figs[ nn ].left() ), static_cast< double >( figs[ mm ].bottom() - figs[ nn ].bottom() ) );
+					bool found = false;
+					for ( size_t kk = 0; kk < cur_fig_groups.size(); ++kk )
 					{
-						// нашли совпадение
-						groups.erase( groups.begin() + mm );
-						merge_was = true;
-						break;
-					}
-				}
-			}
-		}
-	}
-	// todo: сливаем пересекающиеся группы
-	merge_was = true;
-	while ( merge_was )
-	{
-		merge_was = false;
-		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
-		{
-			const set< const figure* > s_cur_f = to_set( groups[ nn ] );
-			for ( size_t mm = 0; mm < groups.size() && !merge_was; ++mm )
-			{
-				if ( nn != mm )
-				{
-					set< const figure* > s_test_f = to_set( groups[ mm ] );
-					if ( find_first_of( s_test_f.begin(), s_test_f.end(), s_cur_f.begin(), s_cur_f.end() ) != s_test_f.end() )
-					{
-						// нашли пересечение
-						set< const figure* > ss_nn = to_set( groups[ nn ] );
-						const set< const figure* > ss_mm = to_set( groups[ mm ] );
-						ss_nn.insert( ss_mm.begin(), ss_mm.end() );
-						vector< const figure* > res;
-						for ( set< const figure* >::const_iterator it = ss_nn.begin();
-							it != ss_nn.end(); ++it )
+						// РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РїРѕРїР°РґР°РµС‚ РІ РіСЂСѓРїРїСѓ
+						if ( angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle ) ) )
 						{
-							res.push_back( *it );
+							bool ok = true;
+							// РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ Р±С‹ СѓРіРѕР» Р±С‹Р» С‚Р°РєРѕР№ Р¶Рµ РєР°Рє Рё Сѓ РІСЃРµС… РµР»РµРјРµРЅС‚РѕРІ РіСЂСѓРїРїС‹, С‡С‚Рѕ Р±С‹ РЅРµ Р±С‹Р»Рѕ РґСѓРіРё РёР»Рё РєСЂСѓРіР°
+							for ( size_t yy = 1; yy < cur_fig_groups[ kk ].second.size(); ++yy )
+							{
+								const figure * next_fig = cur_fig_groups[ kk ].second.at( yy );
+								const double angle_to_fig = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - next_fig->left() ), static_cast< double >( figs[ mm ].bottom() - next_fig->bottom() ) );
+								if ( !angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle_to_fig ) ) )
+								{
+									ok = false;
+									break;
+								}
+							}
+							if ( ok )
+							{
+								cur_fig_groups[ kk ].second.push_back( &figs[ mm ] );
+								found = true;
+								break;
+							}
 						}
-						groups[ nn ] = res;
-						groups.erase( groups.begin() + mm );
-						merge_was = true;
-						break;
+					}
+					// СЃРѕР·РґР°РµРј РіСЂСѓРїРїСѓ
+					if ( !found )
+					{
+						figure_group to_add;
+						to_add.push_back( &figs[ nn ] );
+						to_add.push_back( &figs[ mm ] );
+						cur_fig_groups.push_back( make_pair( angle, to_add ) );
 					}
 				}
 			}
 		}
+		// РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ Р±С‹ СЌР»РµРјРµРЅС‚РѕРІ РІ РіСЂСѓРїРїРµ Р±С‹Р»Рѕ Р±РѕР»СЊС€Рµ 3-С…
+		for ( size_t mm = 0; mm < cur_fig_groups.size(); ++mm )
+		{
+			if ( cur_fig_groups[ mm ].second.size() >= 3 )
+			{
+				groups.push_back( cur_fig_groups[ mm ].second );
+			}
+		}
 	}
-	// ищем позиции фигур и соответсвующие им символы
+	// СЃРѕСЂС‚РёСЂСѓРµРј С„РёРіСѓСЂС‹ РІ РіСЂСѓРїРїР°С…
+	for ( size_t nn = 0; nn < groups.size(); ++nn )
+	{
+		sort( groups[ nn ].begin(), groups[ nn ].end(), fig_less_left );
+	}
+	// РІС‹РєРёРґС‹РІР°РµРј СЌР»РµРјРµРЅС‚С‹, С‡С‚Рѕ РІС‹С…РѕРґСЏС‚ Р·Р° СЂР°Р·РјРµСЂС‹ РЅРѕРјРµСЂР°, РїСЂРµРґРїРѕР»РѕРіР°РµРј С‡С‚Рѕ РЅРѕРјРµСЂ РЅРµ С€РёСЂРµ 7 * С€РёСЂРёРЅР° РїРµСЂРІРѕРіРѕ СЌР»РµРјРµРЅС‚Р°
+	remote_too_long_figs_from_first( groups );
+	// РІС‹РєРёРґС‹РІР°РµРј РіСЂСѓРїРїС‹, РіРґРµ РјРµРЅСЊС€Рµ 3-С… СЌР»РµРјРµРЅС‚РѕРІ
+	groups_remove_to_small( groups );
+	// РІС‹РєРёРґС‹РІР°РµРј СЌР»РµРјРµРЅС‚С‹, РЅРµ РїСЂРѕРїРѕСЂС†РёРѕРЅР°Р»СЊРЅС‹Рµ РїРµСЂРІРѕРјСѓ СЌР»РµРјРµРЅС‚Сѓ
+	figs_remove_invalid_from_first_by_size( groups );
+	// РІС‹РєРёРґС‹РІР°РµРј РіСЂСѓРїРїС‹, РіРґРµ РјРµРЅСЊС€Рµ 3-С… СЌР»РµРјРµРЅС‚РѕРІ
+	groups_remove_to_small( groups );
+	// Р’С‹РєРёРґС‹РІР°РµРј РіСЂСѓРїРїС‹, РєРѕС‚РѕСЂС‹Рµ РІРєР»СЋС‡Р°СЋС‚ РІ СЃРµР±СЏ РґСЂСѓРіРёРµ РіСЂСѓРїРїС‹
+	groups_remove_included( groups );
+	// СЃР»РёРІР°РµРј РїРµСЂРµСЃРµРєР°СЋС‰РёРµСЃСЏ РіСЂСѓРїРїС‹
+	groups_merge_intersects( groups );
+	// РёС‰РµРј РїРѕР·РёС†РёРё С„РёРіСѓСЂ Рё СЃРѕРѕС‚РІРµС‚СЃРІСѓСЋС‰РёРµ РёРј СЃРёРјРІРѕР»С‹
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		vector< pair< string, int > > fig_nums_sums;
 		const figure_group& cur_gr = groups[ nn ];
-		// перебираем фигуры, подставляя их на разные места
+		// РїРµСЂРµР±РёСЂР°РµРј С„РёРіСѓСЂС‹, РїРѕРґСЃС‚Р°РІР»СЏСЏ РёС… РЅР° СЂР°Р·РЅС‹Рµ РјРµСЃС‚Р°
 		for ( size_t mm = 0; mm < std::min( cur_gr.size(), size_t( 2 ) ); ++mm )
 		{
 			const figure * cur_fig = cur_gr[ mm ];
 			const std_pair_int cen = cur_fig->center();
-			// подставляем текущую фигуру на все позиции
+			// РїРѕРґСЃС‚Р°РІР»СЏРµРј С‚РµРєСѓС‰СѓСЋ С„РёРіСѓСЂСѓ РЅР° РІСЃРµ РїРѕР·РёС†РёРё
 			for ( int ll = 0; ll < 1; ++ll )
 			{
-				// todo: 52 НЕВЕРНО, ПОСТАВИТЬ ПРАВИЛЬНОЕ (35-41-46)
+				// todo: 52 РќР•Р’Р•Р РќРћ, РџРћРЎРўРђР’РРўР¬ РџР РђР’РР›Р¬РќРћР• (35-41-46)
 				for ( int oo = 30; oo < 50; ++oo )
 				{
 					const float move_koef = static_cast< float >( cur_fig->height() ) / ( ll >= 1 && ll <= 3 ? (float)( oo + 15 ) : (float)oo );
-
 					vector< std_pair_int > pis = std_calc_centers( ll, move_koef );
 
-//					рисуем точки
+//					СЂРёСЃСѓРµРј С‚РѕС‡РєРё
 //					Mat colored_gr( etal.size(), CV_8UC3 );
 //					cvtColor( etal, colored_gr, CV_GRAY2RGB );
 
@@ -666,9 +694,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 							&& procs_figs.find( ff ) == procs_figs.end() )
 						{
 							procs_figs.insert( ff );
-
 							const pair< char, double > cc = std_find_sym( kk >= 1 && kk <= 3, ff, etal );
-
 							if ( cc.first != 0 )
 							{
 								pair< const figure*, int > fig_pos = make_pair( ff, kk );
@@ -701,58 +727,15 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 			}
 		}
 
-		// выбираем лучшее
-		int best_index = -1;
-		float best_sum = 0.;
-		(void)best_sum;
-		for ( size_t nn = 0; nn < fig_nums_sums.size(); ++nn )
+		// РІС‹Р±РёСЂР°РµРј Р»СѓС‡С€РµРµ
+		const pair< string, int > best_num = find_best_number_by_weight( fig_nums_sums );
+		if ( !best_num.first.empty() )
 		{
-			if ( best_index == - 1 )
-			{
-				best_index = 0;
-			}
-			else
-			{
-				if ( fig_nums_sums[ nn ].second > fig_nums_sums[ best_index ].second )
-				{
-					best_index = nn;
-				}
-			}
-		}
-		if ( best_index != -1 )
-		{
-			ret.push_back( fig_nums_sums.at( best_index ) );
-/*			пытался посчитать общую сумму, это оставим на потом
- *			int found_syms = 0;
-			const std::string test_num = fig_nums_sums.at( best_index ).first;
-			for ( int rr = 0; rr < test_num.size(); ++rr )
-			{
-				if ( test_num.at( rr ) != '?' )
-				{
-					++found_syms;
-				}
-			}
-			if ( found_syms * 23 <= fig_nums_sums.at( best_index ).second )
-			{
-				ret.push_back( fig_nums_sums.at( best_index ) );
-				stringstream out;
-				out << "next figure: " << fig_nums_sums.at( best_index ).first << " " << fig_nums_sums.at( best_index ).second;
-				recog_debug->out_string( out.str() );
-			}
-			else
-			{
-				qDebug() << "not found number in group";
-			}*/
-		}
-		else
-		{
-			recog_debug->out_string( "not found number in group" );
+			ret.push_back( best_num );
 		}
 	}
 
-	// todo: пытаемся определить что где стоит
-
-	// отрисовываем выбранные группы
+	// РѕС‚СЂРёСЃРѕРІС‹РІР°РµРј РІС‹Р±СЂР°РЅРЅС‹Рµ РіСЂСѓРїРїС‹
 /*	for ( int nn = 0; nn < groups.size(); ++nn )
 	{
 		Mat colored_rect( etal.size(), CV_8UC3 );
@@ -765,20 +748,6 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 		recog_debug->out_image( colored_rect );
 	}*/
 	return ret;
-}
-
-std::pair< std::string, int > find_best( const std::vector< std::pair< std::string, int > >& vals )
-{
-	int best_index = -1;
-	for ( size_t nn = 0; nn < vals.size(); ++nn )
-	{
-		if ( best_index == -1
-			|| vals[ best_index ].second < vals[ nn ].second )
-		{
-			best_index = nn;
-		}
-	}
-	return best_index == -1 ? std::make_pair( std::string(), 0 ) : vals[ best_index ];
 }
 
 int fine_best_level( map< int, pair< string, int > >& found_nums )
@@ -805,63 +774,63 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 {
 	const int best_level = fine_best_level( found_nums );
 	assert( best_level != -1 );
-	// первое
+	// РїРµСЂРІРѕРµ
 	if ( best_level == found_nums.begin()->first )
 	{
 		map< int, pair< string, int > >::const_iterator it = found_nums.begin();
 		++it;
 		if ( it->second.second == -1 )
 		{
-			// еще не считали
+			// РµС‰Рµ РЅРµ СЃС‡РёС‚Р°Р»Рё
 			return it->first;
 		}
 		else
 		{
-			// считали и он меньше первого
+			// СЃС‡РёС‚Р°Р»Рё Рё РѕРЅ РјРµРЅСЊС€Рµ РїРµСЂРІРѕРіРѕ
 			return -1;
 		}
 	}
-	// последнее
+	// РїРѕСЃР»РµРґРЅРµРµ
 	map< int, pair< string, int > >::const_iterator it_end = found_nums.end();
 	--it_end;
 	if ( best_level == it_end->first )
 	{
-		// предпоследнее
+		// РїСЂРµРґРїРѕСЃР»РµРґРЅРµРµ
 		--it_end;
 		if ( it_end->second.second == -1 )
 		{
-			// еще не считали
+			// РµС‰Рµ РЅРµ СЃС‡РёС‚Р°Р»Рё
 			return it_end->first;
 		}
 		else
 		{
-			// считали и он меньше последнего
+			// СЃС‡РёС‚Р°Р»Рё Рё РѕРЅ РјРµРЅСЊС€Рµ РїРѕСЃР»РµРґРЅРµРіРѕ
 			return -1;
 		}
 	}
-	// лучшее
+	// Р»СѓС‡С€РµРµ
 	map< int, pair< string, int > >::const_iterator it_best = found_nums.find( best_level );
 	map< int, pair< string, int > >::const_iterator it_prev = --found_nums.find( best_level );
 	map< int, pair< string, int > >::const_iterator it_next = ++found_nums.find( best_level );
-	// проверяем что нашли на двух шагах одно и тоже
+	// РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РЅР°С€Р»Рё РЅР° РґРІСѓС… С€Р°РіР°С… РѕРґРЅРѕ Рё С‚РѕР¶Рµ
 	if ( it_best->second.first == it_prev->second.first
 		|| it_best->second.first == it_next->second.first )
 	{
 		return -1;
 	}
-	// если с двух сторо найдено, то ничего не ищем больше
+	// РµСЃР»Рё СЃ РґРІСѓС… СЃС‚РѕСЂРѕ РЅР°Р№РґРµРЅРѕ, С‚Рѕ РЅРёС‡РµРіРѕ РЅРµ РёС‰РµРј Р±РѕР»СЊС€Рµ
 	if ( it_next->second.second != -1
 		&& it_prev->second.second != -1 )
 	{
 		return -1;
 	}
-	// если с двух сторон пусто, то идем вниз
+	// РµСЃР»Рё СЃ РґРІСѓС… СЃС‚РѕСЂРѕРЅ РїСѓСЃС‚Рѕ, С‚Рѕ РёРґРµРј РІРЅРёР·
 	if ( it_next->second.second == -1
 		&& it_prev->second.second == -1 )
 	{
 		return it_prev->first;
 	}
-	// идем в ту сторону, где не найдено
+	// РёРґРµРј РІ С‚Сѓ СЃС‚РѕСЂРѕРЅСѓ, РіРґРµ РЅРµ РЅР°Р№РґРµРЅРѕ
 	if ( it_prev->second.second == -1 )
 	{
 		return it_prev->first;
@@ -870,7 +839,7 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 	{
 		return it_next->first;
 	}
-	assert( !"тут не должны быть" );
+	assert( !"С‚СѓС‚ РЅРµ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ" );
 	return -1;
 }
 
@@ -879,8 +848,8 @@ std::pair< std::string, int > read_number_loop( const cv::Mat& image, map< int, 
 	int next_level = find_next_level( found_nums );
 	while ( next_level != -1 )
 	{
-		const vector< pair< string, int > > cur_nums = read_number( image, next_level, recog_debug );
-		const pair< string, int > best_num = find_best( cur_nums );
+		const vector< pair< string, int > > cur_nums = read_number_impl( image, next_level, recog_debug );
+		const pair< string, int > best_num = find_best_number_by_weight( cur_nums );
 		found_nums[ next_level ] = best_num;
 
 		next_level = find_next_level( found_nums );
@@ -930,8 +899,8 @@ std::pair< std::string, int > read_number( const cv::Mat& image, recog_debug_cal
 	first_search_levels.push_back( 239 );
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
 	{
-		const vector< pair< string, int > > cur_nums = read_number( image, first_search_levels.at( nn ), recog_debug );
-		const pair< string, int > best_num = find_best( cur_nums );
+		const vector< pair< string, int > > cur_nums = read_number_impl( image, first_search_levels.at( nn ), recog_debug );
+		const pair< string, int > best_num = find_best_number_by_weight( cur_nums );
 		found_nums[ first_search_levels.at( nn ) ] = best_num;
 		if ( best_num.second != 0 )
 		{
@@ -943,17 +912,18 @@ std::pair< std::string, int > read_number( const cv::Mat& image, recog_debug_cal
 
 std::pair< std::string, int > read_number_by_level( const cv::Mat& image, int gray_level, recog_debug_callback *recog_debug )
 {
-	return find_best( read_number( image, gray_level, recog_debug ) );
+	return find_best_number_by_weight( read_number_impl( image, gray_level, recog_debug ) );
 }
 
-std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, int grey_level, recog_debug_callback *recog_debug )
+std::vector< std::pair< std::string, int > > read_number_impl( const cv::Mat& input, int grey_level, recog_debug_callback *recog_debug )
 {
+	calcs_figs.clear();
 	Mat gray( input.size(), CV_8U );
 	cvtColor( input, gray, CV_RGB2GRAY );
 //	recog_debug->out_image( gray );
 	Mat img_bw = gray > grey_level;
 //	recog_debug->out_image( img_bw );
-/*		// вырезаем одиночные пиксели (пока не нужно)
+/*		// РІС‹СЂРµР·Р°РµРј РѕРґРёРЅРѕС‡РЅС‹Рµ РїРёРєСЃРµР»Рё (РїРѕРєР° РЅРµ РЅСѓР¶РЅРѕ)
 	for ( int nn = 0; nn < img_bw.rows; ++nn )
 	{
 		for ( int mm = 0; mm < img_bw.cols - 2; ++mm )
@@ -984,8 +954,8 @@ std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, 
 	cv::Mat img_to_rez = img_bw.clone();
 	vector< figure > figs;
 	figs.reserve( 1000 );
-	//надо увеличить скорость разбития картинки на фигуры
-	// бьем картинку на фигуры
+	//РЅР°РґРѕ СѓРІРµР»РёС‡РёС‚СЊ СЃРєРѕСЂРѕСЃС‚СЊ СЂР°Р·Р±РёС‚РёСЏ РєР°СЂС‚РёРЅРєРё РЅР° С„РёРіСѓСЂС‹
+	// Р±СЊРµРј РєР°СЂС‚РёРЅРєСѓ РЅР° С„РёРіСѓСЂС‹
 	for ( int nn = 0; nn < img_bw.rows; ++nn )
 	{
 		for ( int mm = 0; mm < img_bw.cols; ++mm )
@@ -996,7 +966,7 @@ std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, 
 				add_pixel_as_spy( nn, mm, img_bw, fig_to_create );
 				if ( fig_to_create.is_valid() )
 				{
-					// проверяем что высота больше ширины
+					// РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РІС‹СЃРѕС‚Р° Р±РѕР»СЊС€Рµ С€РёСЂРёРЅС‹
 					if ( fig_to_create.width() < fig_to_create.height() )
 					{
 						if ( fig_to_create.width() > 4 )
@@ -1011,7 +981,7 @@ std::vector< std::pair< std::string, int > > read_number( const cv::Mat& input, 
 			}
 		}
 	}
-	// отрисовываем найденные фигуры
+	// РѕС‚СЂРёСЃРѕРІС‹РІР°РµРј РЅР°Р№РґРµРЅРЅС‹Рµ С„РёРіСѓСЂС‹
 	if ( !figs.empty() )
 	{
 		Mat colored_rect_1( input.size(), CV_8UC3 );
