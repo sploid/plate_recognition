@@ -27,7 +27,7 @@ class recog_test : public QDialog, public recog_debug_callback
 
 public:
 	recog_test( QWidget *parent );
-	static IplImage* QImage2IplImage( const QImage& qImage );
+	static cv::Mat QImage2cvMat( const QImage& qImage );
 	static QImage Mat2QImage( const cv::Mat& iplImage );
 	void out_image( const cv::Mat & m );
 	void out_string( const std::string& text );

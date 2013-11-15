@@ -68,7 +68,7 @@ void recog_test::on_m_but_left_clicked()
 void recog_test::on_m_but_run_clicked()
 {
 	using namespace std;
-	const pair< string, int > num = read_number_by_level( QImage2IplImage( cur_image() ), ui.m_le_row_num->text().toInt(), this );
+	const pair< string, int > num = read_number_by_level( QImage2cvMat( cur_image() ), ui.m_le_row_num->text().toInt(), this );
 	stringstream stream;
 	if ( num.first.empty() )
 	{
@@ -123,59 +123,69 @@ void recog_test::on_m_but_load_image_clicked()
 	}
 }
 
-IplImage* recog_test::QImage2IplImage( const QImage& qImage )
+cv::Mat recog_test::QImage2cvMat( const QImage& q_image )
 {
-	int width = qImage.width();
-	int height = qImage.height();
-
-	// Creates a iplImage with 3 channels
-	IplImage *img = cvCreateImage( cvSize( width, height ), IPL_DEPTH_8U, 3 );
-	char * imgBuffer = img->imageData;
-
-	//Remove alpha channel
-	int jump = qImage.bytesPerLine() / qImage.width();// ( qImage.hasAlphaChannel() ) ? 4 : 3;
-
-	for ( int y = 0; y < img->height; ++y )
+	const int width = q_image.width();
+	const int height = q_image.height();
+	const int count_channels = q_image.bytesPerLine() == q_image.width() + 1 ? 1 : 3;
+	if ( count_channels == 3 )
 	{
-		QByteArray a( (const char*)qImage.scanLine( y ), qImage.bytesPerLine() );
-		for ( int i = 0; i < a.size(); i += jump )
+		cv::Mat ret( cvSize( width, height ), CV_8UC3 );
+		for ( int y = 0; y < height; ++y )
 		{
-			//Swap from RGB to BGR
-			imgBuffer[ 2 ] = a[ i + 2 ];
-			imgBuffer[ 1 ] = a[ i + 1 ];
-			imgBuffer[ 0 ] = a[ i ];
-			imgBuffer += 3;
+			for ( int i = 0; i < width; ++i )
+			{
+				const QColor next_pixel = q_image.pixel( i, y );
+				ret.at< Vec3b >( y, i ) = Vec3b( static_cast< unsigned char >( next_pixel.blue() ), static_cast< unsigned char >( next_pixel.green() ), static_cast< unsigned char >( next_pixel.red() ) );
+			}
 		}
+		return ret;
 	}
-
-	return img;
+	else if ( count_channels == 1 )
+	{
+		Mat ret( cvSize( width, height ), CV_8U );
+		for ( int y = 0; y < height; ++y )
+		{
+			for ( int i = 0; i < width; ++i )
+			{
+				const int gray_pixel = qGray( q_image.pixel( i, y ) );
+				ret.at< unsigned char >( y, i ) = static_cast< unsigned char >( gray_pixel );
+			}
+		}
+		return ret;
+	}
+	else
+	{
+		Q_ASSERT(false);
+		return cv::Mat();
+	}
 }
 
 QImage recog_test::Mat2QImage( const cv::Mat& mat )
 {
 	const int height = mat.rows;
 	const int width = mat.cols;
-
 	if ( mat.depth() == CV_MAT_DEPTH( CV_8U ) && mat.channels() == 3 )
 	{
-		const uchar *qImageBuffer = (const uchar*)mat.ptr();
-		QImage img(qImageBuffer, width, height, QImage::Format_RGB888);
-		return img.rgbSwapped();
+		const QImage ret( (const uchar*)mat.ptr(), width, height, QImage::Format_RGB888 );
+		return ret.rgbSwapped();
 	}
 	else if ( mat.depth() == CV_MAT_DEPTH( CV_8U ) && mat.channels() == 1 )
 	{
-		const uchar *qImageBuffer = (const uchar*)mat.ptr();
-		QImage img( qImageBuffer, width, height, QImage::Format_Indexed8 );
-		QVector< QRgb > colorTable;
-		for ( int i = 0; i < 256; ++i )
+		QImage ret( width, height, QImage::Format_RGB32 );
+		for( int nn = 0; nn < height; ++nn )
 		{
-			colorTable.push_back( qRgb( i, i, i ) );
+			for ( int mm = 0; mm < width; ++mm )
+			{
+				const unsigned char next_pixel = static_cast< int >( mat.at< unsigned char >( nn, mm ) );
+				ret.setPixel( mm, nn, qRgb( next_pixel, next_pixel, next_pixel ) );
+			}
 		}
-		img.setColorTable( colorTable );
-		return img;
+		return ret;
 	}
 	else if ( mat.depth() == CV_MAT_DEPTH( CV_32F ) && mat.channels() == 1 )
 	{
+		Q_ASSERT(!"сомневаюсь что это работает");
 		QImage ret( width, height, QImage::Format_Indexed8 );
 		QVector< QRgb > colorTable;
 		for ( int i = 0; i < 256; ++i )
