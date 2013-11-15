@@ -8,30 +8,30 @@ using namespace std;
 
 std::vector< std::pair< std::string, int > > read_number_impl( const cv::Mat& image, int grey_level, recog_debug_callback *recog_debug );
 
-typedef std::pair< int, int > std_pair_int;
+typedef std::pair< int, int > pair_int;
 
-inline std_pair_int operator-( const std_pair_int& lh, const std_pair_int& rh )
+inline pair_int operator-( const pair_int& lh, const pair_int& rh )
 {
 	return make_pair( lh.first - rh.first, lh.second - rh.second );
 }
 
-inline std_pair_int operator+( const std_pair_int& lh, const std_pair_int& rh )
+inline pair_int operator+( const pair_int& lh, const pair_int& rh )
 {
 	return make_pair( lh.first + rh.first, lh.second + rh.second );
 }
 
-inline std_pair_int operator*( const std_pair_int& lh, const double& koef )
+inline pair_int operator*( const pair_int& lh, const double& koef )
 {
 	return make_pair( static_cast< int >( static_cast< double >( lh.first ) * koef ), static_cast< int >( static_cast< double >( lh.second ) * koef ) );
 }
 
-
-vector< std_pair_int > std_calc_centers( int index, float move_koef )
+// Рассчитываем центры символов
+vector< pair_int > calc_syms_centers( int index, float move_koef )
 {
-	vector< std_pair_int > ret;
+	vector< pair_int > ret;
 // 1 - 37x46
 // 2 - 33x56
-	vector< std_pair_int > etalons;
+	vector< pair_int > etalons;
 	etalons.push_back( make_pair( 43, 7 ) );
 	etalons.push_back( make_pair( 38, 0 ) );
 	etalons.push_back( make_pair( 38, 0 ) );
@@ -112,7 +112,7 @@ public:
 	}
 	int width() const { return m_right - m_left; }
 	int height() const { return m_bottom - m_top; }
-	void add_point( const std_pair_int& val )
+	void add_point( const pair_int& val )
 	{
 		if ( too_big() )
 			return;
@@ -139,13 +139,13 @@ public:
 			//m_points.clear();
 		}
 	}
-	std_pair_int center() const
+	pair_int center() const
 	{
 		const int hor = ( m_right - m_left ) / 2;
 		const int ver = ( m_bottom - m_top ) / 2;
 		return make_pair( hor, ver );
 	}
-	std_pair_int top_left() const
+	pair_int top_left() const
 	{
 		return make_pair( left(), top() );
 	}
@@ -165,7 +165,7 @@ public:
 	{
 		return m_bottom;
 	}
-	std_pair_int bottom_right() const
+	pair_int bottom_right() const
 	{
 		return make_pair( right(), bottom() );
 	}
@@ -236,7 +236,7 @@ double std_calc_sym( const cv::Mat& cur_mat, const vector< vector< float > >& sy
 	return sum;
 }
 
-pair< char, double > std_find_sym( bool num, const figure* fig, const cv::Mat& etal )
+pair< char, double > find_sym( bool num, const figure* fig, const cv::Mat& etal )
 {
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
@@ -359,8 +359,8 @@ pair< char, double > std_find_sym( bool num, const figure* fig, const cv::Mat& e
 
 void add_pixel_as_spy( int nn, int mm, cv::Mat& mat, figure& fig )
 {
-	static vector< std_pair_int > points_dublicate;
-	static vector< std_pair_int > pix_around( 4 );
+	static vector< pair_int > points_dublicate;
+	static vector< pair_int > pix_around( 4 );
 	static bool init = false;
 	if ( !init )
 	{
@@ -377,7 +377,7 @@ void add_pixel_as_spy( int nn, int mm, cv::Mat& mat, figure& fig )
 	}
 
 
-	fig.add_point( std_pair_int( nn, mm ) );
+	fig.add_point( pair_int( nn, mm ) );
 	points_dublicate.clear();
 	points_dublicate.push_back( make_pair( nn, mm ) );
 	// что бы не зациклилось
@@ -423,7 +423,7 @@ bool std_less_left_ref( const figure& lf, const figure& rf )
 
 typedef vector< const figure* > figure_group;
 
-const figure* find_figure( const figure_group& gr, const std_pair_int& pos )
+const figure* find_figure( const figure_group& gr, const pair_int& pos )
 {
 	for ( size_t nn = 0; nn < gr.size(); ++nn )
 	{
@@ -575,12 +575,10 @@ void figs_remove_invalid_from_first_by_size( vector< figure_group > & groups )
 	}
 }
 
-std::vector< std::pair< string, int > > procces_found_figs( vector< figure > figs, cv::Mat& etal, recog_debug_callback *recog_debug )
+// по отдельным фигурам создаем группы фигур
+std::vector< figure_group > make_groups( vector< figure >& figs )
 {
-	(void)recog_debug;
-	vector< pair< string, int > > ret;
-	sort( figs.begin(), figs.end(), std_less_left_ref );
-	// бьем по группам в зависимости от угла наклона элементов отностительно друг друга
+	using namespace std;
 	vector< figure_group > groups;
 	for ( size_t nn = 0; nn < figs.size(); ++nn )
 	{
@@ -635,15 +633,22 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 		{
 			if ( cur_fig_groups[ mm ].second.size() >= 3 )
 			{
+				// сортируем фигуры в группах, что бы они шли слева направо
+				sort( cur_fig_groups[ mm ].second.begin(), cur_fig_groups[ mm ].second.end(), fig_less_left );
 				groups.push_back( cur_fig_groups[ mm ].second );
 			}
 		}
 	}
-	// сортируем фигуры в группах
-	for ( size_t nn = 0; nn < groups.size(); ++nn )
-	{
-		sort( groups[ nn ].begin(), groups[ nn ].end(), fig_less_left );
-	}
+	return groups;
+}
+
+std::vector< std::pair< string, int > > procces_found_figs( vector< figure >& figs, cv::Mat& etal, recog_debug_callback *recog_debug )
+{
+	(void)recog_debug;
+	vector< pair< string, int > > ret;
+	sort( figs.begin(), figs.end(), std_less_left_ref );
+	// бьем по группам в зависимости от угла наклона элементов отностительно друг друга
+	vector< figure_group > groups = make_groups( figs );
 	// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
 	remote_too_long_figs_from_first( groups );
 	// выкидываем группы, где меньше 3-х элементов
@@ -665,7 +670,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 		for ( size_t mm = 0; mm < std::min( cur_gr.size(), size_t( 2 ) ); ++mm )
 		{
 			const figure * cur_fig = cur_gr[ mm ];
-			const std_pair_int cen = cur_fig->center();
+			const pair_int cen = cur_fig->center();
 			// подставляем текущую фигуру на все позиции
 			for ( int ll = 0; ll < 1; ++ll )
 			{
@@ -673,20 +678,21 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 				for ( int oo = 30; oo < 50; ++oo )
 				{
 					const float move_koef = static_cast< float >( cur_fig->height() ) / ( ll >= 1 && ll <= 3 ? (float)( oo + 15 ) : (float)oo );
-					vector< std_pair_int > pis = std_calc_centers( ll, move_koef );
+					vector< pair_int > pis = calc_syms_centers( ll, move_koef );
 
 //					рисуем точки
-//					Mat colored_gr( etal.size(), CV_8UC3 );
-//					cvtColor( etal, colored_gr, CV_GRAY2RGB );
+					Mat colored_gr( etal.size(), CV_8UC3 );
+					cvtColor( etal, colored_gr, CV_GRAY2RGB );
 
 					for ( size_t kk = 0; kk < pis.size(); ++kk )
 					{
 						pis[ kk ] = pis[ kk ] + cen + cur_fig->top_left();
-//						cv::circle( colored_gr, Point( pis[ kk ].first, pis[ kk ].second ), 1, CV_RGB( 255, 0, 0 ) );
+						cv::circle( colored_gr, Point( pis[ kk ].first, pis[ kk ].second ), 1, CV_RGB( 255, 0, 0 ) );
 					}
 //					recog_debug->out_image( colored_gr );
+
 					set< const figure* > procs_figs;
-					vector< pair< pair< const figure*, int >, pair< char, double > > > figs_by_pos;
+					vector< pair< pair< const figure*, size_t >, pair< char, double > > > figs_by_pos;
 					for ( size_t kk = 0; kk < pis.size(); ++kk )
 					{
 						const figure* ff = find_figure( cur_gr, pis.at( kk ) );
@@ -694,7 +700,7 @@ std::vector< std::pair< string, int > > procces_found_figs( vector< figure > fig
 							&& procs_figs.find( ff ) == procs_figs.end() )
 						{
 							procs_figs.insert( ff );
-							const pair< char, double > cc = std_find_sym( kk >= 1 && kk <= 3, ff, etal );
+							const pair< char, double > cc = find_sym( kk >= 1 && kk <= 3, ff, etal );
 							if ( cc.first != 0 )
 							{
 								pair< const figure*, int > fig_pos = make_pair( ff, kk );
@@ -917,10 +923,22 @@ std::pair< std::string, int > read_number_by_level( const cv::Mat& image, int gr
 
 std::vector< std::pair< std::string, int > > read_number_impl( const cv::Mat& input, int grey_level, recog_debug_callback *recog_debug )
 {
+	recog_debug->out_image( input );
 	calcs_figs.clear();
 	Mat gray( input.size(), CV_8U );
-	cvtColor( input, gray, CV_RGB2GRAY );
-//	recog_debug->out_image( gray );
+	if (input.channels() == 1 )
+	{
+		gray = input;
+	}
+	else if (input.channels() == 3 )
+	{
+		cvtColor( input, gray, CV_RGB2GRAY );
+	}
+	else
+	{
+		assert( false );
+	}
+	recog_debug->out_image( gray );
 	Mat img_bw = gray > grey_level;
 //	recog_debug->out_image( img_bw );
 /*		// вырезаем одиночные пиксели (пока не нужно)

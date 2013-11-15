@@ -17,7 +17,7 @@ struct debug_out : public recog_debug_callback
 int process_file( const std::string& folder_name, const std::string& file_name )
 {
 	using namespace std;
-	cout << file_name.substr( folder_name.size() + 1, file_name.size() - folder_name.size() ) << "   ";
+	cout << file_name.substr( folder_name.size() + 1, file_name.size() - folder_name.size() - 5 ) << "   ";
 	const cv::Mat image = cv::imread( file_name.c_str(), CV_LOAD_IMAGE_COLOR);   // Read the file
 	if( image.data )
 	{
@@ -43,6 +43,7 @@ int main( int argc, char** argv )
 		cout << "usage: auto_test_desktop image_folder";
 		return 1;
 	}
+	const int64 begin = cv::getTickCount();
 	const string image_folder( argv[ 1 ] );
 	cout << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
 	// грузим список картинок
@@ -65,7 +66,7 @@ int main( int argc, char** argv )
 	}
 	while ( FindNextFile(h_find, &find_file_data) != 0 );
 	FindClose( h_find );
-	cout << "sum: " << sum << endl;
+	cout << "sum: " << sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
 	_getch();
 #else
 #endif
