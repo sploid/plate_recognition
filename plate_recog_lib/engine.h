@@ -16,6 +16,7 @@ struct recog_debug_callback
 
 // @todo: сделать документацию
 // @todo: сделать как-нибудь отличия буквы О от буквы С
+// @todo: увеличить скорость разбития картинки на фигуры
 
 std::pair< std::string, int > PLATE_RECOG_EXPORT read_number( const cv::Mat& image, recog_debug_callback *recog_debug );
 std::pair< std::string, int > PLATE_RECOG_EXPORT read_number_by_level( const cv::Mat& image, int gray_level, recog_debug_callback *recog_debug );
