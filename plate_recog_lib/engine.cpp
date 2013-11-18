@@ -640,7 +640,15 @@ vector< figure_group > make_groups( vector< figure >& figs )
 	return groups;
 }
 
-pair< string, double > create_number_by_pos( const vector< pair_int >& pis, const vector< pair< pair< const figure*, size_t >, pair< char, double > > >& figs_by_pos )
+struct found_symbol
+{
+	const figure* fig;
+	size_t pos_in_pis_index;
+	char symbol;
+	double weight;
+};
+
+pair< string, double > create_number_by_pos( const vector< pair_int >& pis, const vector< found_symbol >& figs_by_pos )
 {
 	pair< string, double > ret = make_pair( string(), 0. );
 	for ( size_t oo = 0; oo < pis.size(); ++oo )
@@ -648,10 +656,10 @@ pair< string, double > create_number_by_pos( const vector< pair_int >& pis, cons
 		bool found = false;
 		for ( size_t kk = 0; kk < figs_by_pos.size(); ++kk )
 		{
-			if ( oo == static_cast< size_t >( figs_by_pos[ kk ].first.second ) )
+			if ( oo == static_cast< size_t >( figs_by_pos[ kk ].pos_in_pis_index ) )
 			{
-				ret.first += figs_by_pos[ kk ].second.first;
-				ret.second += figs_by_pos[ kk ].second.second;
+				ret.first += figs_by_pos[ kk ].symbol;
+				ret.second += figs_by_pos[ kk ].weight;
 				found = true;
 				break;
 			}
@@ -664,22 +672,25 @@ pair< string, double > create_number_by_pos( const vector< pair_int >& pis, cons
 	return ret;
 }
 
-vector< pair< pair< const figure*, size_t >, pair< char, double > > > figs_search_syms( const vector< pair_int >& pis, const figure_group& cur_gr, Mat& etal )
+vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const figure_group& cur_gr, Mat& etal )
 {
-	vector< pair< pair< const figure*, size_t >, pair< char, double > > > ret;
+	vector< found_symbol > ret;
 	set< const figure* > procs_figs;
 	for ( size_t kk = 0; kk < pis.size(); ++kk )
 	{
-		const figure* ff = find_figure( cur_gr, pis.at( kk ) );
-		if ( ff
-			&& procs_figs.find( ff ) == procs_figs.end() )
+		found_symbol next;
+		next.fig = find_figure( cur_gr, pis.at( kk ) );
+		if ( next.fig
+			&& procs_figs.find( next.fig ) == procs_figs.end() )
 		{
-			procs_figs.insert( ff );
-			const pair< char, double > cc = find_sym( kk >= 1 && kk <= 3, ff, etal );
+			procs_figs.insert( next.fig );
+			const pair< char, double > cc = find_sym( kk >= 1 && kk <= 3, next.fig, etal );
 			if ( cc.first != 0 )
 			{
-				pair< const figure*, int > fig_pos = make_pair( ff, kk );
-				ret.push_back( make_pair( fig_pos, cc ) );
+				next.pos_in_pis_index = kk;
+				next.symbol = cc.first;
+				next.weight = cc.second;
+				ret.push_back( next );
 			}
 		}
 	}
@@ -694,24 +705,24 @@ vector< pair< string, int > > search_number( Mat& etal, vector< figure_group >& 
 	{
 		vector< pair< string, int > > fig_nums_sums;
 		const figure_group& cur_gr = groups[ nn ];
-		// перебираем фигуры, подставляя их на разные места
+		// перебираем фигуры, подставляя их на разные места (пока перебираем только фигуры 0-1-2)
 		for ( size_t mm = 0; mm < min( cur_gr.size(), size_t( 2 ) ); ++mm )
 		{
 			const figure * cur_fig = cur_gr[ mm ];
 			const pair_int cen = cur_fig->center();
-			// подставляем текущую фигуру на все позиции
+			// подставляем текущую фигуру на все позиции (пока ставим только на позицию 0-1)
 			for ( int ll = 0; ll < 1; ++ll )
 			{
 				// todo: 52 НЕВЕРНО, ПОСТАВИТЬ ПРАВИЛЬНОЕ (35-41-46)
 				for ( int oo = 30; oo < 50; ++oo )
 				{
-					const float move_koef = static_cast< float >( cur_fig->height() ) / ( ll >= 1 && ll <= 3 ? (float)( oo + 15 ) : (float)oo );
+					const float move_koef = static_cast< float >( cur_fig->height() ) / ( ll >= 1 && ll <= 3 ? static_cast< float >( oo + 15 ) : static_cast< float >( oo ) );
 					vector< pair_int > pis = calc_syms_centers( ll, move_koef );
 					for ( size_t kk = 0; kk < pis.size(); ++kk )
 					{
 						pis[ kk ] = pis[ kk ] + cen + cur_fig->top_left();
 					}
-					const vector< pair< pair< const figure*, size_t >, pair< char, double > > > figs_by_pos = figs_search_syms( pis, cur_gr, etal );
+					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal );
 					const pair< string, double > number_sum = create_number_by_pos( pis, figs_by_pos );
 					fig_nums_sums.push_back( make_pair( number_sum.first, ( static_cast< int >( number_sum.second ) / 1000 ) ) );
 				}
