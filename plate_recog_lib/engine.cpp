@@ -6,9 +6,28 @@
 using namespace cv;
 using namespace std;
 
-vector< pair< string, int > > read_number_impl( const Mat& image, int grey_level, recog_debug_callback *recog_debug );
-
 typedef pair< int, int > pair_int;
+
+// найденный номер
+struct found_number
+{
+	found_number()
+		: number( string() )
+		, weight( -1 )
+	{
+
+	}
+	string number;		// номер
+	int weight;			// вес
+	pair_int left_top;
+	pair_int right_bottom;
+	pair< string, int > to_pair() const
+	{
+		return make_pair( number, weight );
+	}
+};
+
+vector< found_number > read_number_impl( const Mat& image, int grey_level, recog_debug_callback *recog_debug );
 
 inline pair_int operator-( const pair_int& lh, const pair_int& rh )
 {
@@ -32,11 +51,17 @@ vector< pair_int > calc_syms_centers( int index, float move_koef )
 // 1 - 37x46
 // 2 - 33x56
 	vector< pair_int > etalons;
+/*	etalons.push_back( make_pair( 46, 7 ) );
+	etalons.push_back( make_pair( 43, 0 ) );
+	etalons.push_back( make_pair( 44, 0 ) );
+	etalons.push_back( make_pair( 42, -7 ) );
+	etalons.push_back( make_pair( 44, 0 ) );*/
 	etalons.push_back( make_pair( 43, 7 ) );
 	etalons.push_back( make_pair( 38, 0 ) );
 	etalons.push_back( make_pair( 38, 0 ) );
 	etalons.push_back( make_pair( 47, -7 ) );
 	etalons.push_back( make_pair( 44, 0 ) );
+
 	ret.push_back( make_pair( 0, 0 ) );
 	for ( int nn = index - 1; nn >= 0; --nn )
 	{
@@ -56,21 +81,6 @@ vector< pair_int > calc_syms_centers( int index, float move_koef )
 // 4-5 - 47x7
 // 5-6 - 44
 	return ret;
-}
-
-pair< string, int > find_best_number_by_weight( const vector< pair< string, int > >& vals )
-{
-	if ( vals.empty() )
-		return make_pair( string(), 0 );
-	int best_index = 0;
-	for ( size_t nn = 1; nn < vals.size(); ++nn )
-	{
-		if ( vals[ best_index ].second < vals[ nn ].second )
-		{
-			best_index = nn;
-		}
-	}
-	return vals[ best_index ];
 }
 
 // надо сделать какую-то пропорцию для зависимости угла от расстояния
@@ -448,7 +458,7 @@ set< T > to_set( const vector< T >& in )
 // Выкидываем группы, которые включают в себя другие группы
 void groups_remove_included( vector< figure_group > & groups )
 {
-	// todo: переписать постоянное создание QSet
+	// todo: переписать постоянное создание set
 	bool merge_was = true;
 	while ( merge_was )
 	{
@@ -526,7 +536,6 @@ void groups_remove_to_small( vector< figure_group > & groups )
 // выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
 void remote_too_long_figs_from_first( vector< figure_group > & groups )
 {
-	// todo: !!!!!!!!!!!!!если номер будет наклонным, то ширина будет не пропорциональная высоте (надо вводить косинусь угла наклона)!!!!!!!!!!!!!!!!!!!
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		if ( groups[ nn ].size() > 2 )
@@ -648,9 +657,28 @@ struct found_symbol
 	double weight;
 };
 
-pair< string, double > create_number_by_pos( const vector< pair_int >& pis, const vector< found_symbol >& figs_by_pos )
+found_number find_best_number_by_weight( const vector< found_number >& vals )
 {
-	pair< string, double > ret = make_pair( string(), 0. );
+	assert( !vals.empty() );
+	if ( vals.empty() )
+		return found_number();
+	int best_index = 0;
+	for ( size_t nn = 1; nn < vals.size(); ++nn )
+	{
+		if ( vals[ best_index ].weight < vals[ nn ].weight )
+		{
+			best_index = nn;
+		}
+	}
+	return vals[ best_index ];
+}
+
+found_number create_number_by_pos( const vector< pair_int >& pis, const vector< found_symbol >& figs_by_pos )
+{
+	assert( pis.size() == 6 );
+	found_number ret;
+	double weight = 0.; // суммарный вес номера
+	bool first_sym_found = false;
 	for ( size_t oo = 0; oo < pis.size(); ++oo )
 	{
 		bool found = false;
@@ -658,17 +686,34 @@ pair< string, double > create_number_by_pos( const vector< pair_int >& pis, cons
 		{
 			if ( oo == static_cast< size_t >( figs_by_pos[ kk ].pos_in_pis_index ) )
 			{
-				ret.first += figs_by_pos[ kk ].symbol;
-				ret.second += figs_by_pos[ kk ].weight;
+				const found_symbol & cur_sym = figs_by_pos[ kk ];
+				ret.number += cur_sym.symbol;
+				weight += cur_sym.weight;
+				if ( !first_sym_found )
+				{
+					ret.left_top.first = cur_sym.fig->left();
+					ret.left_top.second = cur_sym.fig->top();
+					ret.right_bottom.first = cur_sym.fig->right();
+					ret.right_bottom.second = cur_sym.fig->bottom();
+					first_sym_found = true;
+				}
+				else
+				{
+					ret.left_top.first = std::min( cur_sym.fig->left(), ret.left_top.first );
+					ret.left_top.second = std::min( cur_sym.fig->top(), ret.left_top.second );
+					ret.right_bottom.first = std::max( cur_sym.fig->right(), ret.right_bottom.first );
+					ret.right_bottom.second = std::max( cur_sym.fig->bottom(), ret.right_bottom.second );
+				}
 				found = true;
 				break;
 			}
 		}
 		if ( found == false )
 		{
-			ret.first += "?";
+			ret.number += "?";
 		}
 	}
+	ret.weight = static_cast< int >( weight ) / 1000;
 	return ret;
 }
 
@@ -697,13 +742,13 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const fi
 	return ret;
 }
 
-vector< pair< string, int > > search_number( Mat& etal, vector< figure_group >& groups )
+vector< found_number > search_number( Mat& etal, vector< figure_group >& groups )
 {
 	// ищем позиции фигур и соответсвующие им символы
-	vector< pair< string, int > > ret;
+	vector< found_number > ret;
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
-		vector< pair< string, int > > fig_nums_sums;
+		vector< found_number > fig_nums_sums;
 		const figure_group& cur_gr = groups[ nn ];
 		// перебираем фигуры, подставляя их на разные места (пока перебираем только фигуры 0-1-2)
 		for ( size_t mm = 0; mm < min( cur_gr.size(), size_t( 2 ) ); ++mm )
@@ -723,17 +768,16 @@ vector< pair< string, int > > search_number( Mat& etal, vector< figure_group >& 
 						pis[ kk ] = pis[ kk ] + cen + cur_fig->top_left();
 					}
 					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal );
-					const pair< string, double > number_sum = create_number_by_pos( pis, figs_by_pos );
-					fig_nums_sums.push_back( make_pair( number_sum.first, ( static_cast< int >( number_sum.second ) / 1000 ) ) );
+					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
+					fig_nums_sums.push_back( number_sum );
 				}
 			}
 		}
 
 		// выбираем лучшее
-		const pair< string, int > best_num = find_best_number_by_weight( fig_nums_sums );
-		if ( !best_num.first.empty() )
+		if ( !fig_nums_sums.empty() )
 		{
-			ret.push_back( best_num );
+			ret.push_back( find_best_number_by_weight( fig_nums_sums ) );
 		}
 	}
 
@@ -752,17 +796,17 @@ vector< pair< string, int > > search_number( Mat& etal, vector< figure_group >& 
 	return ret;
 }
 
-int fine_best_level( map< int, pair< string, int > >& found_nums )
+int fine_best_level( map< int, found_number >& found_nums )
 {
 	int ret = -1;
 	int best_val = -1;
-	for ( map< int, pair< string, int > >::const_iterator it = found_nums.begin(); it != found_nums.end(); ++it )
+	for ( map< int, found_number >::const_iterator it = found_nums.begin(); it != found_nums.end(); ++it )
 	{
-		const int cur_val = it->second.second;
+		const int cur_val = it->second.weight;
 		if ( cur_val != -1 )
 		{
 			if ( best_val == -1
-				|| found_nums[ ret ].second < cur_val )
+				|| found_nums[ ret ].weight < cur_val )
 			{
 				ret = it->first;
 				best_val = cur_val;
@@ -772,16 +816,16 @@ int fine_best_level( map< int, pair< string, int > >& found_nums )
 	return ret;
 }
 
-int find_next_level( map< int, pair< string, int > >& found_nums )
+int find_next_level( map< int, found_number >& found_nums )
 {
 	const int best_level = fine_best_level( found_nums );
 	assert( best_level != -1 );
 	// первое
 	if ( best_level == found_nums.begin()->first )
 	{
-		map< int, pair< string, int > >::const_iterator it = found_nums.begin();
+		map< int, found_number >::const_iterator it = found_nums.begin();
 		++it;
-		if ( it->second.second == -1 )
+		if ( it->second.weight == -1 )
 		{
 			// еще не считали
 			return it->first;
@@ -793,13 +837,13 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 		}
 	}
 	// последнее
-	map< int, pair< string, int > >::const_iterator it_end = found_nums.end();
+	map< int, found_number >::const_iterator it_end = found_nums.end();
 	--it_end;
 	if ( best_level == it_end->first )
 	{
 		// предпоследнее
 		--it_end;
-		if ( it_end->second.second == -1 )
+		if ( it_end->second.weight == -1 )
 		{
 			// еще не считали
 			return it_end->first;
@@ -811,33 +855,33 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 		}
 	}
 	// лучшее
-	map< int, pair< string, int > >::const_iterator it_best = found_nums.find( best_level );
-	map< int, pair< string, int > >::const_iterator it_prev = --found_nums.find( best_level );
-	map< int, pair< string, int > >::const_iterator it_next = ++found_nums.find( best_level );
+	map< int, found_number >::const_iterator it_best = found_nums.find( best_level );
+	map< int, found_number >::const_iterator it_prev = --found_nums.find( best_level );
+	map< int, found_number >::const_iterator it_next = ++found_nums.find( best_level );
 	// проверяем что нашли на двух шагах одно и тоже
-	if ( it_best->second.first == it_prev->second.first
-		|| it_best->second.first == it_next->second.first )
+	if ( it_best->second.number == it_prev->second.number
+		|| it_best->second.number == it_next->second.number )
 	{
 		return -1;
 	}
 	// если с двух сторо найдено, то ничего не ищем больше
-	if ( it_next->second.second != -1
-		&& it_prev->second.second != -1 )
+	if ( it_next->second.weight != -1
+		&& it_prev->second.weight != -1 )
 	{
 		return -1;
 	}
 	// если с двух сторон пусто, то идем вниз
-	if ( it_next->second.second == -1
-		&& it_prev->second.second == -1 )
+	if ( it_next->second.weight == -1
+		&& it_prev->second.weight == -1 )
 	{
 		return it_prev->first;
 	}
 	// идем в ту сторону, где не найдено
-	if ( it_prev->second.second == -1 )
+	if ( it_prev->second.weight == -1 )
 	{
 		return it_prev->first;
 	}
-	if ( it_next->second.second == -1 )
+	if ( it_next->second.weight == -1 )
 	{
 		return it_next->first;
 	}
@@ -845,44 +889,38 @@ int find_next_level( map< int, pair< string, int > >& found_nums )
 	return -1;
 }
 
-pair< string, int > read_number_loop( const Mat& image, map< int, pair< string, int > >& found_nums, recog_debug_callback *recog_debug )
+pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, recog_debug_callback *recog_debug )
 {
 	int next_level = find_next_level( found_nums );
 	while ( next_level != -1 )
 	{
-		const vector< pair< string, int > > cur_nums = read_number_impl( image, next_level, recog_debug );
-		const pair< string, int > best_num = find_best_number_by_weight( cur_nums );
-		found_nums[ next_level ] = best_num;
-
+		const vector< found_number > cur_nums = read_number_impl( image, next_level, recog_debug );
+		if ( cur_nums.empty() )
+		{
+			found_number num_zero;
+			num_zero.weight = 0;
+			found_nums[ next_level ] = num_zero;
+		}
+		else
+		{
+			found_nums[ next_level ] = find_best_number_by_weight( cur_nums );
+		}
 		next_level = find_next_level( found_nums );
 	}
 
 	const int best_level = fine_best_level( found_nums );
 	assert( best_level != -1 );
-	return found_nums[ best_level ];
+	const found_number& best_number = found_nums[ best_level ];
+	// рисуем квадрат номера
+	Mat num_rect_image = image.clone();
+	rectangle( num_rect_image, Point( best_number.left_top.first, best_number.left_top.second ), Point( best_number.right_bottom.first, best_number.right_bottom.second ), CV_RGB( 0, 255, 0 ) );
+	recog_debug->out_image( num_rect_image );
+	return found_nums[ best_level ].to_pair();
 }
 
 pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_debug )
 {
 	assert( recog_debug );
-	map< int, pair< string, int > > found_nums;
-	found_nums[ 127 ] = make_pair( string(), -1 );
-	found_nums[ 63  ] = make_pair( string(), -1 );
-	found_nums[ 191 ] = make_pair( string(), -1 );
-	found_nums[ 31  ] = make_pair( string(), -1 );
-	found_nums[ 95  ] = make_pair( string(), -1 );
-	found_nums[ 159 ] = make_pair( string(), -1 );
-	found_nums[ 223 ] = make_pair( string(), -1 );
-	found_nums[ 15  ] = make_pair( string(), -1 );
-	found_nums[ 47  ] = make_pair( string(), -1 );
-	found_nums[ 79  ] = make_pair( string(), -1 );
-	found_nums[ 111 ] = make_pair( string(), -1 );
-	found_nums[ 143 ] = make_pair( string(), -1 );
-	found_nums[ 175 ] = make_pair( string(), -1 );
-	found_nums[ 207 ] = make_pair( string(), -1 );
-	found_nums[ 239 ] = make_pair( string(), -1 );
-
-	vector< pair< string, int > > all_nums;
 	vector< int > first_search_levels;
 	first_search_levels.push_back( 127 );
 	first_search_levels.push_back( 63 );
@@ -899,14 +937,24 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 	first_search_levels.push_back( 175 );
 	first_search_levels.push_back( 207 );
 	first_search_levels.push_back( 239 );
+
+	map< int, found_number > found_nums;
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
 	{
-		const vector< pair< string, int > > cur_nums = read_number_impl( image, first_search_levels.at( nn ), recog_debug );
-		const pair< string, int > best_num = find_best_number_by_weight( cur_nums );
-		found_nums[ first_search_levels.at( nn ) ] = best_num;
-		if ( best_num.second != 0 )
+		found_nums[ first_search_levels[ nn ] ] = found_number();
+	}
+
+	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
+	{
+		const vector< found_number > cur_nums = read_number_impl( image, first_search_levels.at( nn ), recog_debug );
+		if ( !cur_nums.empty() )
 		{
-			return read_number_loop( image, found_nums, recog_debug );
+			const found_number best_num = find_best_number_by_weight( cur_nums );
+			found_nums[ first_search_levels.at( nn ) ] = best_num;
+			if ( best_num.weight != 0 )
+			{
+				return read_number_loop( image, found_nums, recog_debug );
+			}
 		}
 	}
 	return make_pair( string( "" ), 0 );
@@ -914,7 +962,16 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 
 pair< string, int > read_number_by_level( const Mat& image, int gray_level, recog_debug_callback *recog_debug )
 {
-	return find_best_number_by_weight( read_number_impl( image, gray_level, recog_debug ) );
+	const vector< found_number > fn = read_number_impl( image, gray_level, recog_debug );
+	if ( fn.empty() )
+	{
+		return make_pair( string(), 0 );
+	}
+	else
+	{
+		const found_number best_num = find_best_number_by_weight( fn );
+		return make_pair( best_num.number, best_num.weight );
+	}
 }
 
 // бьем картинку на фигуры
@@ -1011,7 +1068,7 @@ Mat create_binary_mat_by_level( const Mat& input, int gray_level )
 	return gray > gray_level;
 }
 
-vector< pair< string, int > > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
+vector< found_number > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
 {
 	calcs_figs.clear();
 	Mat img_bw = create_binary_mat_by_level( input, gray_level );
@@ -1033,5 +1090,7 @@ vector< pair< string, int > > read_number_impl( const Mat& input, int gray_level
 	groups_remove_included( groups );
 	// сливаем пересекающиеся группы
 	groups_merge_intersects( groups );
-	return search_number( img_to_rez, groups );
+	// ищем номера
+	const vector< found_number > nums = search_number( img_to_rez, groups );
+	return nums;
 }
