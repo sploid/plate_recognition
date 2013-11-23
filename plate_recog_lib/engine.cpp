@@ -8,6 +8,120 @@ using namespace std;
 
 typedef pair< int, int > pair_int;
 
+class figure
+{
+public:
+	figure()
+		: m_left( -1 )
+		, m_right( -1 )
+		, m_top( -1 )
+		, m_bottom( -1 )
+		, m_too_big( false )
+	{
+	}
+	int width() const
+	{
+		return m_right - m_left;
+	}
+	int height() const
+	{
+		return m_bottom - m_top;
+	}
+	bool is_empty() const
+	{
+		return m_left == -1 && m_right == -1 && m_top == -1 && m_bottom == -1;
+	}
+	void add_point( const pair_int& val )
+	{
+		if ( too_big() )
+			return;
+		if ( m_left == - 1 || m_left > val.second )
+		{
+			m_left = val.second;
+		}
+		if ( m_top == - 1 || m_top > val.first )
+		{
+			m_top = val.first;
+		}
+		if ( m_right == - 1 || m_right < val.second )
+		{
+			m_right = val.second;
+		}
+		if ( m_bottom == - 1 || m_bottom < val.first )
+		{
+			m_bottom = val.first;
+		}
+		if ( right() - left() > 50 )
+		{
+			m_too_big = true;
+		}
+	}
+	pair_int center() const
+	{
+		const int hor = ( m_right - m_left ) / 2;
+		const int ver = ( m_bottom - m_top ) / 2;
+		return make_pair( hor, ver );
+	}
+	pair_int top_left() const
+	{
+		return make_pair( left(), top() );
+	}
+	int left() const
+	{
+		return m_left;
+	}
+	int top() const
+	{
+		return m_top;
+	}
+	int right() const
+	{
+		return m_right;
+	}
+	int bottom() const
+	{
+		return m_bottom;
+	}
+	pair_int bottom_right() const
+	{
+		return make_pair( right(), bottom() );
+	}
+	bool is_valid() const
+	{
+		return !m_too_big && !is_empty();
+	}
+	bool too_big() const
+	{
+		return m_too_big;
+	}
+	bool operator<( const figure & other ) const
+	{
+		if ( m_left != other.m_left )
+			return m_left < other.m_left;
+		else if ( m_top != other.m_top )
+			return m_top < other.m_top;
+		else if ( m_right != other.m_right )
+			return m_right < other.m_right;
+		else if ( m_bottom != other.m_bottom )
+			return m_bottom < other.m_bottom;
+		else
+			return false;
+	}
+	bool operator==( const figure & other ) const
+	{
+		return m_left == other.m_left
+			&& m_right == other.m_right
+			&& m_top == other.m_top
+			&& m_bottom == other.m_bottom;
+	}
+private:
+	int m_left;
+	int m_right;
+	int m_top;
+	int m_bottom;
+	bool m_too_big;
+};
+
 // найденный номер
 struct found_number
 {
@@ -15,12 +129,10 @@ struct found_number
 		: number( string() )
 		, weight( -1 )
 	{
-
 	}
 	string number;		// номер
 	int weight;			// вес
-	pair_int left_top;
-	pair_int right_bottom;
+	vector< figure > figs;
 	pair< string, int > to_pair() const
 	{
 		return make_pair( number, weight );
@@ -108,98 +220,7 @@ bool angle_is_equal( int an1, int an2 )
 	return false;
 }
 
-
-class figure
-{
-public:
-	figure()
-		: m_left( -1 )
-		, m_right( -1 )
-		, m_top( -1 )
-		, m_bottom( -1 )
-		, m_too_big( false )
-	{
-	}
-	int width() const { return m_right - m_left; }
-	int height() const { return m_bottom - m_top; }
-	void add_point( const pair_int& val )
-	{
-		if ( too_big() )
-			return;
-		//m_points.insert( val );
-		if ( m_left == - 1 || m_left > val.second )
-		{
-			m_left = val.second;
-		}
-		if ( m_top == - 1 || m_top > val.first )
-		{
-			m_top = val.first;
-		}
-		if ( m_right == - 1 || m_right < val.second )
-		{
-			m_right = val.second;
-		}
-		if ( m_bottom == - 1 || m_bottom < val.first )
-		{
-			m_bottom = val.first;
-		}
-		if ( right() - left() > 50 )
-		{
-			m_too_big = true;
-			//m_points.clear();
-		}
-	}
-	pair_int center() const
-	{
-		const int hor = ( m_right - m_left ) / 2;
-		const int ver = ( m_bottom - m_top ) / 2;
-		return make_pair( hor, ver );
-	}
-	pair_int top_left() const
-	{
-		return make_pair( left(), top() );
-	}
-	int left() const
-	{
-		return m_left;
-	}
-	int top() const
-	{
-		return m_top;
-	}
-	int right() const
-	{
-		return m_right;
-	}
-	int bottom() const
-	{
-		return m_bottom;
-	}
-	pair_int bottom_right() const
-	{
-		return make_pair( right(), bottom() );
-	}
-	bool is_valid() const
-	{
-		return !m_too_big
-			&& m_left != -1
-			&& m_right != -1
-			&& m_top != -1
-			&& m_bottom != -1;
-	}
-	bool too_big() const
-	{
-		return m_too_big;
-	}
-private:
-	int m_left;
-	int m_right;
-	int m_top;
-	int m_bottom;
-	bool m_too_big;
-};
-
-typedef map< pair< bool, const figure* >, pair< char, double > > clacs_figs_type;
+typedef map< pair< bool, figure >, pair< char, double > > clacs_figs_type;
 clacs_figs_type calcs_figs;
 
 double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
@@ -244,7 +265,7 @@ double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
 	return sum;
 }
 
-pair< char, double > find_sym( bool num, const figure* fig, const Mat& etal )
+pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal )
 {
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
@@ -310,7 +331,7 @@ pair< char, double > find_sym( bool num, const figure* fig, const Mat& etal )
 		sums_syms_elements[ nn ] = (float)min_sum_full_syms / sums_syms_elements[ nn ];
 	}
 
-	Mat cur_mat( etal, Rect( fig->left(), fig->top(), fig->width() + 1, fig->height() + 1 ) );
+	Mat cur_mat( etal, Rect( fig.left(), fig.top(), fig.width() + 1, fig.height() + 1 ) );
 	int best_index = -1;
 	double max_sum = 0.;
 	for ( size_t kk = 0; kk < cur_syms->size(); ++kk )
@@ -419,29 +440,29 @@ void add_pixel_as_spy( int nn, int mm, Mat& mat, figure& fig )
 	}
 }
 
-bool fig_less_left( const figure* lf, const figure* rf )
+bool fig_less_left( const figure& lf, const figure& rf )
 {
-	return lf->left() < rf->left();
+	return lf.left() < rf.left();
 }
 
 bool less_by_left_pos( const figure& lf, const figure& rf )
 {
-	return fig_less_left( &lf, &rf );
+	return fig_less_left( lf, rf );
 }
 
-typedef vector< const figure* > figure_group;
+typedef vector< figure > figure_group;
 
-const figure* find_figure( const figure_group& gr, const pair_int& pos )
+figure find_figure( const figure_group& gr, const pair_int& pos )
 {
 	for ( size_t nn = 0; nn < gr.size(); ++nn )
 	{
-		if ( gr.at( nn )->top_left() <= pos
-			&& gr.at( nn )->bottom_right() >= pos )
+		if ( gr[ nn ].top_left() <= pos
+			&& gr[ nn ].bottom_right() >= pos )
 		{
-			return gr.at( nn );
+			return gr[ nn ];
 		}
 	}
-	return 0;
+	return figure();
 }
 
 template< class T >
@@ -465,12 +486,12 @@ void groups_remove_included( vector< figure_group > & groups )
 		merge_was = false;
 		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
 		{
-			const set< const figure* > s_cur_f = to_set( groups[ nn ] );
+			const set< figure > s_cur_f = to_set( groups[ nn ] );
 			for ( size_t mm = 0; mm < groups.size() && !merge_was; mm++ )
 			{
 				if ( nn != mm )
 				{
-					const set< const figure* > s_test_f = to_set( groups[ mm ] );
+					const set< figure > s_test_f = to_set( groups[ mm ] );
 					if ( includes( s_cur_f.begin(), s_cur_f.end(), s_test_f.begin(), s_test_f.end() ) )
 					{
 						// нашли совпадение
@@ -493,20 +514,20 @@ void groups_merge_intersects( vector< figure_group > & groups )
 		merge_was = false;
 		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
 		{
-			const set< const figure* > s_cur_f = to_set( groups[ nn ] );
+			const set< figure > s_cur_f = to_set( groups[ nn ] );
 			for ( size_t mm = 0; mm < groups.size() && !merge_was; ++mm )
 			{
 				if ( nn != mm )
 				{
-					set< const figure* > s_test_f = to_set( groups[ mm ] );
+					set< figure > s_test_f = to_set( groups[ mm ] );
 					if ( find_first_of( s_test_f.begin(), s_test_f.end(), s_cur_f.begin(), s_cur_f.end() ) != s_test_f.end() )
 					{
 						// нашли пересечение
-						set< const figure* > ss_nn = to_set( groups[ nn ] );
-						const set< const figure* > ss_mm = to_set( groups[ mm ] );
+						set< figure > ss_nn = to_set( groups[ nn ] );
+						const set< figure > ss_mm = to_set( groups[ mm ] );
 						ss_nn.insert( ss_mm.begin(), ss_mm.end() );
-						vector< const figure* > res;
-						for ( set< const figure* >::const_iterator it = ss_nn.begin();
+						vector< figure > res;
+						for ( set< figure >::const_iterator it = ss_nn.begin();
 							it != ss_nn.end(); ++it )
 						{
 							res.push_back( *it );
@@ -540,13 +561,13 @@ void remote_too_long_figs_from_first( vector< figure_group > & groups )
 	{
 		if ( groups[ nn ].size() > 2 )
 		{
-			const figure* first_fig = groups[ nn ].at( 0 );
-			const double width_first = first_fig->right() - first_fig->left();
-			assert( width_first > 0. );
+			const figure& first_fig = groups[ nn ].at( 0 );
+			const double width_first = first_fig.right() - first_fig.left();
+			assert( first_fig.width() > 0. );
 			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
 			{
-				const figure* cur_fig = groups[ nn ][ mm ];
-				if ( double( cur_fig->left() - first_fig->left() ) / 7. > width_first )
+				const figure& cur_fig = groups[ nn ][ mm ];
+				if ( double( cur_fig.left() - first_fig.left() ) / 7. > width_first )
 				{
 					groups[ nn ].erase( groups[ nn ].begin() + mm );
 				}
@@ -564,15 +585,15 @@ void figs_remove_invalid_from_first_by_size( vector< figure_group > & groups )
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		assert( groups[ nn ].size() > 2 );
-		const figure* first_fig = groups[ nn ][ 0 ];
-		const double width_first = first_fig->right() - first_fig->left();
-		const double height_first = first_fig->bottom() - first_fig->top();
+		const figure& first_fig = groups[ nn ][ 0 ];
+		const double width_first = first_fig.right() - first_fig.left();
+		const double height_first = first_fig.bottom() - first_fig.top();
 		assert( width_first > 0. );
 		for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
 		{
-			const figure* cur_fig = groups[ nn ][ mm ];
-			const double width_cur = cur_fig->right() - cur_fig->left();
-			const double height_cur = first_fig->bottom() - first_fig->top();
+			const figure& cur_fig = groups[ nn ][ mm ];
+			const double width_cur = cur_fig.right() - cur_fig.left();
+			const double height_cur = first_fig.bottom() - first_fig.top();
 			if ( width_cur > width_first * 1.5 || width_cur < width_first * 0.6
 				|| height_cur > height_first * 1.5 || height_cur < height_first * 0.6 )
 			{
@@ -608,8 +629,8 @@ vector< figure_group > make_groups( vector< figure >& figs )
 							// проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
 							for ( size_t yy = 1; yy < cur_fig_groups[ kk ].second.size(); ++yy )
 							{
-								const figure * next_fig = cur_fig_groups[ kk ].second.at( yy );
-								const double angle_to_fig = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - next_fig->left() ), static_cast< double >( figs[ mm ].bottom() - next_fig->bottom() ) );
+								const figure& next_fig = cur_fig_groups[ kk ].second.at( yy );
+								const double angle_to_fig = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - next_fig.left() ), static_cast< double >( figs[ mm ].bottom() - next_fig.bottom() ) );
 								if ( !angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle_to_fig ) ) )
 								{
 									ok = false;
@@ -618,7 +639,7 @@ vector< figure_group > make_groups( vector< figure >& figs )
 							}
 							if ( ok )
 							{
-								cur_fig_groups[ kk ].second.push_back( &figs[ mm ] );
+								cur_fig_groups[ kk ].second.push_back( figs[ mm ] );
 								found = true;
 								break;
 							}
@@ -628,8 +649,8 @@ vector< figure_group > make_groups( vector< figure >& figs )
 					if ( !found )
 					{
 						figure_group to_add;
-						to_add.push_back( &figs[ nn ] );
-						to_add.push_back( &figs[ mm ] );
+						to_add.push_back( figs[ nn ] );
+						to_add.push_back( figs[ mm ] );
 						cur_fig_groups.push_back( make_pair( angle, to_add ) );
 					}
 				}
@@ -651,7 +672,7 @@ vector< figure_group > make_groups( vector< figure >& figs )
 
 struct found_symbol
 {
-	const figure* fig;
+	figure fig;
 	size_t pos_in_pis_index;
 	char symbol;
 	double weight;
@@ -678,7 +699,6 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 	assert( pis.size() == 6 );
 	found_number ret;
 	double weight = 0.; // суммарный вес номера
-	bool first_sym_found = false;
 	for ( size_t oo = 0; oo < pis.size(); ++oo )
 	{
 		bool found = false;
@@ -689,21 +709,7 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 				const found_symbol & cur_sym = figs_by_pos[ kk ];
 				ret.number += cur_sym.symbol;
 				weight += cur_sym.weight;
-				if ( !first_sym_found )
-				{
-					ret.left_top.first = cur_sym.fig->left();
-					ret.left_top.second = cur_sym.fig->top();
-					ret.right_bottom.first = cur_sym.fig->right();
-					ret.right_bottom.second = cur_sym.fig->bottom();
-					first_sym_found = true;
-				}
-				else
-				{
-					ret.left_top.first = std::min( cur_sym.fig->left(), ret.left_top.first );
-					ret.left_top.second = std::min( cur_sym.fig->top(), ret.left_top.second );
-					ret.right_bottom.first = std::max( cur_sym.fig->right(), ret.right_bottom.first );
-					ret.right_bottom.second = std::max( cur_sym.fig->bottom(), ret.right_bottom.second );
-				}
+				ret.figs.push_back( cur_sym.fig );
 				found = true;
 				break;
 			}
@@ -720,12 +726,13 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const figure_group& cur_gr, Mat& etal )
 {
 	vector< found_symbol > ret;
-	set< const figure* > procs_figs;
+	set< figure > procs_figs;
 	for ( size_t kk = 0; kk < pis.size(); ++kk )
 	{
 		found_symbol next;
 		next.fig = find_figure( cur_gr, pis.at( kk ) );
-		if ( next.fig
+//		const bool bbb = procs_figs.find( next.fig ) == procs_figs.end();
+		if ( !next.fig.is_empty()
 			&& procs_figs.find( next.fig ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
@@ -753,19 +760,19 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups 
 		// перебираем фигуры, подставляя их на разные места (пока перебираем только фигуры 0-1-2)
 		for ( size_t mm = 0; mm < min( cur_gr.size(), size_t( 2 ) ); ++mm )
 		{
-			const figure * cur_fig = cur_gr[ mm ];
-			const pair_int cen = cur_fig->center();
+			const figure & cur_fig = cur_gr[ mm ];
+			const pair_int cen = cur_fig.center();
 			// подставляем текущую фигуру на все позиции (пока ставим только на позицию 0-1)
 			for ( int ll = 0; ll < 1; ++ll )
 			{
 				// todo: 52 НЕВЕРНО, ПОСТАВИТЬ ПРАВИЛЬНОЕ (35-41-46)
 				for ( int oo = 30; oo < 50; ++oo )
 				{
-					const float move_koef = static_cast< float >( cur_fig->height() ) / ( ll >= 1 && ll <= 3 ? static_cast< float >( oo + 15 ) : static_cast< float >( oo ) );
+					const float move_koef = static_cast< float >( cur_fig.height() ) / ( ll >= 1 && ll <= 3 ? static_cast< float >( oo + 15 ) : static_cast< float >( oo ) );
 					vector< pair_int > pis = calc_syms_centers( ll, move_koef );
 					for ( size_t kk = 0; kk < pis.size(); ++kk )
 					{
-						pis[ kk ] = pis[ kk ] + cen + cur_fig->top_left();
+						pis[ kk ] = pis[ kk ] + cen + cur_fig.top_left();
 					}
 					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal );
 					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
@@ -913,9 +920,13 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	const found_number& best_number = found_nums[ best_level ];
 	// рисуем квадрат номера
 	Mat num_rect_image = image.clone();
-	rectangle( num_rect_image, Point( best_number.left_top.first, best_number.left_top.second ), Point( best_number.right_bottom.first, best_number.right_bottom.second ), CV_RGB( 0, 255, 0 ) );
+	for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
+	{
+		const figure& cur_fig = best_number.figs[ nn ];
+		rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
+	}
 	recog_debug->out_image( num_rect_image );
-	return found_nums[ best_level ].to_pair();
+	return best_number.to_pair();
 }
 
 pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_debug )
