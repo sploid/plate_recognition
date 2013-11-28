@@ -24,7 +24,12 @@ int process_file( const std::string& folder_name, const std::string& file_name )
 		const int64 begin = cv::getTickCount();
 		debug_out rc;
 		const pair< string, int > number = read_number( image, &rc );
-		cout << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
+		cout << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency());
+		if ( file_name.find(number.first) == string::npos )
+		{
+			cout << "  !!  ";
+		}
+		cout << endl;
 		return number.second;
 	}
 	else

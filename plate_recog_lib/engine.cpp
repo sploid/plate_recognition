@@ -7,6 +7,7 @@ using namespace cv;
 using namespace std;
 
 typedef pair< int, int > pair_int;
+typedef pair< double, double > pair_doub;
 
 class figure
 {
@@ -58,8 +59,8 @@ public:
 	}
 	pair_int center() const
 	{
-		const int hor = ( m_right - m_left ) / 2;
-		const int ver = ( m_bottom - m_top ) / 2;
+		const int hor = m_left + ( m_right - m_left ) / 2;
+		const int ver = m_top + ( m_bottom - m_top ) / 2;
 		return make_pair( hor, ver );
 	}
 	pair_int top_left() const
@@ -157,41 +158,30 @@ inline pair_int operator*( const pair_int& lh, const double& koef )
 }
 
 // Рассчитываем центры символов
-vector< pair_int > calc_syms_centers( int index, float move_koef )
+vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height )
 {
-	vector< pair_int > ret;
-// 1 - 37x46
-// 2 - 33x56
+	const double angl_grad = static_cast< double >( angle ) * 3.14 / 180.;
+	const double move_by_x = static_cast< double >( first_fig_height ) * 0.96 * cos( angl_grad );
+	const double move_by_y = static_cast< double >( first_fig_height ) * 0.16 * cos( angl_grad );
 	vector< pair_int > etalons;
-/*	etalons.push_back( make_pair( 46, 7 ) );
-	etalons.push_back( make_pair( 43, 0 ) );
-	etalons.push_back( make_pair( 44, 0 ) );
-	etalons.push_back( make_pair( 42, -7 ) );
-	etalons.push_back( make_pair( 44, 0 ) );*/
-	etalons.push_back( make_pair( 43, 7 ) );
-	etalons.push_back( make_pair( 38, 0 ) );
-	etalons.push_back( make_pair( 38, 0 ) );
-	etalons.push_back( make_pair( 47, -7 ) );
-	etalons.push_back( make_pair( 44, 0 ) );
+	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), static_cast< int >( move_by_y ) ) );
+	etalons.push_back( make_pair( static_cast< int >( 2. * move_by_x ), 0 ) );
+	etalons.push_back( make_pair( static_cast< int >( 3. * move_by_x ), 0 ) );
+	etalons.push_back( make_pair( static_cast< int >( 4. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( make_pair( static_cast< int >( 5. * move_by_x ), 0 ) );
 
-	ret.push_back( make_pair( 0, 0 ) );
+	vector< pair_int > ret;
+	const pair_int ret_front( make_pair( 0, 0 ) );
+	ret.push_back( ret_front );
+
 	for ( int nn = index - 1; nn >= 0; --nn )
 	{
-		ret.insert( ret.begin(), ret.front() - etalons.at( nn ) );
+		ret.insert( ret.begin(), ret_front - etalons.at( nn ) );
 	}
 	for ( int nn = index; nn < 6 - 1; ++nn )
 	{
-		ret.push_back( ret.back() + etalons.at( nn ) );
+		ret.push_back( ret_front + etalons.at( nn ) );
 	}
-	for ( size_t nn = 0; nn < ret.size(); ++nn )
-	{
-		ret[ nn ] = ret.at( nn ) * move_koef;
-	}
-// 1-2 - 43x7
-// 2-3 - 38
-// 3-4 - 38
-// 4-5 - 47x7
-// 5-6 - 44
 	return ret;
 }
 
@@ -731,7 +721,6 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const fi
 	{
 		found_symbol next;
 		next.fig = find_figure( cur_gr, pis.at( kk ) );
-//		const bool bbb = procs_figs.find( next.fig ) == procs_figs.end();
 		if ( !next.fig.is_empty()
 			&& procs_figs.find( next.fig ) == procs_figs.end() )
 		{
@@ -762,17 +751,16 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups 
 		{
 			const figure & cur_fig = cur_gr[ mm ];
 			const pair_int cen = cur_fig.center();
-			// подставляем текущую фигуру на все позиции (пока ставим только на позицию 0-1)
+			// подставляем текущую фигуру на все позиции (пока ставим только первую и вторую фигуру)
 			for ( int ll = 0; ll < 1; ++ll )
 			{
-				// todo: 52 НЕВЕРНО, ПОСТАВИТЬ ПРАВИЛЬНОЕ (35-41-46)
-				for ( int oo = 30; oo < 50; ++oo )
+				// меняем угол наклона номера относительно нас (0 - смотрим прям на номер)
+				for ( int oo = 0; oo < 50; oo += 10 )
 				{
-					const float move_koef = static_cast< float >( cur_fig.height() ) / ( ll >= 1 && ll <= 3 ? static_cast< float >( oo + 15 ) : static_cast< float >( oo ) );
-					vector< pair_int > pis = calc_syms_centers( ll, move_koef );
-					for ( size_t kk = 0; kk < pis.size(); ++kk )
+					vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
+					for ( size_t kk = 0; kk < pis.size(); ++kk ) // сдвигаем все относительно центра первой фигуры
 					{
-						pis[ kk ] = pis[ kk ] + cen + cur_fig.top_left();
+						pis[ kk ] = pis[ kk ] + cen;
 					}
 					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal );
 					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
