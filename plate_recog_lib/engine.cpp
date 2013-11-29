@@ -160,10 +160,19 @@ inline pair_int operator*( const pair_int& lh, const double& koef )
 // Рассчитываем центры символов
 vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height )
 {
-	const double angl_grad = static_cast< double >( angle ) * 3.14 / 180.;
-	const double move_by_x = static_cast< double >( first_fig_height ) * 0.96 * cos( angl_grad );
-	const double move_by_y = static_cast< double >( first_fig_height ) * 0.16 * cos( angl_grad );
+	const double angl_grad = static_cast< double >( std::abs( angle ) ) * 3.14 / 180.;
+	const double koef = static_cast< double >( first_fig_height ) * cos( angl_grad );
+	const double move_by_y = koef * 0.15;
+	double move_by_x = 0.;
 	vector< pair_int > etalons;
+	if ( angle >= 0 )
+	{
+		move_by_x = koef * 0.96;
+	}
+	else
+	{
+		move_by_x = koef * 1.06;
+	}
 	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), static_cast< int >( move_by_y ) ) );
 	etalons.push_back( make_pair( static_cast< int >( 2. * move_by_x ), 0 ) );
 	etalons.push_back( make_pair( static_cast< int >( 3. * move_by_x ), 0 ) );
@@ -754,8 +763,8 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups 
 			// подставляем текущую фигуру на все позиции (пока ставим только первую и вторую фигуру)
 			for ( int ll = 0; ll < 1; ++ll )
 			{
-				// меняем угол наклона номера относительно нас (0 - смотрим прям на номер)
-				for ( int oo = 0; oo < 50; oo += 10 )
+				// меняем угол наклона номера относительно нас (0 - смотрим прям на номер, если угол меньше 0, то определяем номер с 2-х значным регионом)
+				for ( int oo = -50; oo < 50; oo += 10 )
 				{
 					vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
 					for ( size_t kk = 0; kk < pis.size(); ++kk ) // сдвигаем все относительно центра первой фигуры
