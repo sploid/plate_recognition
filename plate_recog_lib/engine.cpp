@@ -820,82 +820,96 @@ int fine_best_level( map< int, found_number >& found_nums )
 	return ret;
 }
 
-int find_next_level( map< int, found_number >& found_nums )
+int find_next_level( map< int, found_number >& found_nums, int gray_step )
 {
-	const int best_level = fine_best_level( found_nums );
-	assert( best_level != -1 );
-	// первое
-	if ( best_level == found_nums.begin()->first )
+	if ( gray_step > 0 )
 	{
-		map< int, found_number >::const_iterator it = found_nums.begin();
-		++it;
-		if ( it->second.weight == -1 )
+		for ( map< int, found_number >::const_iterator it = found_nums.begin(); it != found_nums.end(); ++it )
 		{
-			// еще не считали
-			return it->first;
+			if ( it->second.weight == -1 )
+			{
+				return it->first;
+			}
 		}
-		else
-		{
-			// считали и он меньше первого
-			return -1;
-		}
+		return -1;
 	}
-	// последнее
-	map< int, found_number >::const_iterator it_end = found_nums.end();
-	--it_end;
-	if ( best_level == it_end->first )
+	else
 	{
-		// предпоследнее
+		const int best_level = fine_best_level( found_nums );
+		assert( best_level != -1 );
+		// первое
+		if ( best_level == found_nums.begin()->first )
+		{
+			map< int, found_number >::const_iterator it = found_nums.begin();
+			++it;
+			if ( it->second.weight == -1 )
+			{
+				// еще не считали
+				return it->first;
+			}
+			else
+			{
+				// считали и он меньше первого
+				return -1;
+			}
+		}
+		// последнее
+		map< int, found_number >::const_iterator it_end = found_nums.end();
 		--it_end;
-		if ( it_end->second.weight == -1 )
+		if ( best_level == it_end->first )
 		{
-			// еще не считали
-			return it_end->first;
+			// предпоследнее
+			--it_end;
+			if ( it_end->second.weight == -1 )
+			{
+				// еще не считали
+				return it_end->first;
+			}
+			else
+			{
+				// считали и он меньше последнего
+				return -1;
+			}
 		}
-		else
+		// лучшее
+		map< int, found_number >::const_iterator it_best = found_nums.find( best_level );
+		map< int, found_number >::const_iterator it_prev = --found_nums.find( best_level );
+		map< int, found_number >::const_iterator it_next = ++found_nums.find( best_level );
+		// проверяем что нашли на двух шагах одно и тоже
+		if ( it_best->second.number == it_prev->second.number
+			|| it_best->second.number == it_next->second.number )
 		{
-			// считали и он меньше последнего
 			return -1;
 		}
-	}
-	// лучшее
-	map< int, found_number >::const_iterator it_best = found_nums.find( best_level );
-	map< int, found_number >::const_iterator it_prev = --found_nums.find( best_level );
-	map< int, found_number >::const_iterator it_next = ++found_nums.find( best_level );
-	// проверяем что нашли на двух шагах одно и тоже
-	if ( it_best->second.number == it_prev->second.number
-		|| it_best->second.number == it_next->second.number )
-	{
+		// если с двух сторо найдено, то ничего не ищем больше
+		if ( it_next->second.weight != -1
+			&& it_prev->second.weight != -1 )
+		{
+			return -1;
+		}
+		// если с двух сторон пусто, то идем вниз
+		if ( it_next->second.weight == -1
+			&& it_prev->second.weight == -1 )
+		{
+			return it_prev->first;
+		}
+		// идем в ту сторону, где не найдено
+		if ( it_prev->second.weight == -1 )
+		{
+			return it_prev->first;
+		}
+		if ( it_next->second.weight == -1 )
+		{
+			return it_next->first;
+		}
+		assert( !"тут не должны быть" );
 		return -1;
 	}
-	// если с двух сторо найдено, то ничего не ищем больше
-	if ( it_next->second.weight != -1
-		&& it_prev->second.weight != -1 )
-	{
-		return -1;
-	}
-	// если с двух сторон пусто, то идем вниз
-	if ( it_next->second.weight == -1
-		&& it_prev->second.weight == -1 )
-	{
-		return it_prev->first;
-	}
-	// идем в ту сторону, где не найдено
-	if ( it_prev->second.weight == -1 )
-	{
-		return it_prev->first;
-	}
-	if ( it_next->second.weight == -1 )
-	{
-		return it_next->first;
-	}
-	assert( !"тут не должны быть" );
-	return -1;
 }
 
-pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, recog_debug_callback *recog_debug )
+pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, recog_debug_callback *recog_debug, int gray_step )
 {
-	int next_level = find_next_level( found_nums );
+	int next_level = find_next_level( found_nums, gray_step );
 	while ( next_level != -1 )
 	{
 		const vector< found_number > cur_nums = read_number_impl( image, next_level, recog_debug );
@@ -909,7 +923,7 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 		{
 			found_nums[ next_level ] = find_best_number_by_weight( cur_nums );
 		}
-		next_level = find_next_level( found_nums );
+		next_level = find_next_level( found_nums, gray_step );
 	}
 
 	const int best_level = fine_best_level( found_nums );
@@ -926,25 +940,35 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	return best_number.to_pair();
 }
 
-pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_debug )
+pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_debug, int gray_step )
 {
 	assert( recog_debug );
 	vector< int > first_search_levels;
-	first_search_levels.push_back( 127 );
-	first_search_levels.push_back( 63 );
-	first_search_levels.push_back( 191 );
-	first_search_levels.push_back( 31 );
-	first_search_levels.push_back( 95 );
-	first_search_levels.push_back( 159 );
-	first_search_levels.push_back( 223 );
-	first_search_levels.push_back( 15 );
-	first_search_levels.push_back( 47 );
-	first_search_levels.push_back( 79 );
-	first_search_levels.push_back( 111 );
-	first_search_levels.push_back( 143 );
-	first_search_levels.push_back( 175 );
-	first_search_levels.push_back( 207 );
-	first_search_levels.push_back( 239 );
+	if ( gray_step <= 0 )
+	{
+		first_search_levels.push_back( 127 );
+		first_search_levels.push_back( 63 );
+		first_search_levels.push_back( 191 );
+		first_search_levels.push_back( 31 );
+		first_search_levels.push_back( 95 );
+		first_search_levels.push_back( 159 );
+		first_search_levels.push_back( 223 );
+		first_search_levels.push_back( 15 );
+		first_search_levels.push_back( 47 );
+		first_search_levels.push_back( 79 );
+		first_search_levels.push_back( 111 );
+		first_search_levels.push_back( 143 );
+		first_search_levels.push_back( 175 );
+		first_search_levels.push_back( 207 );
+		first_search_levels.push_back( 239 );
+	}
+	else
+	{
+		for ( int nn = gray_step; nn < 255; nn += gray_step )
+		{
+			first_search_levels.push_back( nn );
+		}
+	}
 
 	map< int, found_number > found_nums;
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
@@ -961,7 +985,7 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 			found_nums[ first_search_levels.at( nn ) ] = best_num;
 			if ( best_num.weight != 0 )
 			{
-				return read_number_loop( image, found_nums, recog_debug );
+				return read_number_loop( image, found_nums, recog_debug, gray_step );
 			}
 		}
 	}
