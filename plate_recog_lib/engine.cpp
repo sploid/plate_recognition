@@ -937,6 +937,36 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 		rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
 	}
 	recog_debug->out_image( num_rect_image );
+
+	const vector< figure >& figs = best_number.figs;
+	if ( figs.size() == 6 ) // ищем регион только если у нас есть все 6 символов
+	{
+		int sum_dist = 0;
+		for ( int nn = 5; nn >= 1; --nn )
+		{
+			sum_dist += figs.at( nn ).center().first - figs.at( nn - 1 ).center().first;
+		}
+		// средняя дистанция между символами
+		const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
+		const double koef_height = 0.76; // отношение высоты буквы к цифре
+		// средняя высота буквы
+		const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
+			+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
+		const double div_sym_hei_to_dis = avarage_distance / avarage_height;
+		const double koef_move_by_2_sym_reg = 1.06;
+		if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
+		{
+			// точно 2-х символьный регион и угол наклона 0
+		}
+		else
+		{
+			// угол наклона номера, если у нас 2-х символьный регион
+			const double angle_2_sym_reg = div_sym_hei_to_dis > koef_move_by_2_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_2_sym_reg ) * 180. / 3.14;
+			const double koef_move_by_3_sym_reg = 0.96;
+			// угол наклона номера, если у нас 3-х символьный регион
+			const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg ) * 180. / 3.14;
+		}
+	}
 	return best_number.to_pair();
 }
 
