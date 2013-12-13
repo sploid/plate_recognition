@@ -907,6 +907,86 @@ int find_next_level( map< int, found_number >& found_nums, int gray_step )
 	}
 }
 
+Mat create_binary_mat_by_level( const Mat& input, int gray_level )
+{
+	Mat gray( input.size(), CV_8U );
+	if ( input.channels() == 1 )
+	{
+		gray = input;
+	}
+	else if ( input.channels() == 3 )
+	{
+		cvtColor( input, gray, CV_RGB2GRAY );
+	}
+	else
+	{
+		assert( !"не поддерживаемое количество каналов" );
+	}
+	return gray > gray_level;
+}
+
+// бьем картинку на фигуры
+vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
+{
+	vector< figure > ret;
+	ret.reserve( 1000 );
+	for ( int nn = 0; nn < mat.rows; ++nn )
+	{
+		for ( int mm = 0; mm < mat.cols; ++mm )
+		{
+			if ( mat.at< unsigned char >( nn, mm ) == 0 )
+			{
+				figure fig_to_create;
+				add_pixel_as_spy( nn, mm, mat, fig_to_create );
+				if ( fig_to_create.is_valid() )
+				{
+					// проверяем что высота больше ширины
+					if ( fig_to_create.width() < fig_to_create.height() )
+					{
+						if ( fig_to_create.width() > 4 )
+						{
+							if ( fig_to_create.height() / fig_to_create.width() < 4 )
+							{
+								ret.push_back( fig_to_create );
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// отрисовываем найденные фигуры
+	if ( !ret.empty() )
+	{
+		Mat colored_mat( mat.size(), CV_8UC3 );
+		cvtColor( mat, colored_mat, CV_GRAY2RGB );
+		for ( size_t nn = 0; nn < ret.size(); ++nn )
+		{
+			rectangle( colored_mat, Point( ret[ nn ].left(), ret[ nn ].top() ), Point( ret[ nn ].right(), ret[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
+		}
+		recog_debug->out_image( colored_mat );
+	}
+	sort( ret.begin(), ret.end(), less_by_left_pos );
+	return ret;
+}
+
+void fill_reg( vector< vector< pair_doub > >& data, double x1, double y1, double x2, double y2, double x3, double y3 )
+{
+	vector< pair_doub > tt;
+	tt.push_back( make_pair( x1, y1 ) );
+	tt.push_back( make_pair( x2, y2 ) );
+	tt.push_back( make_pair( x3, y3 ) );
+	data.push_back( tt );
+}
+
+void fill_reg( vector< vector< pair_doub > >& data, double x1, double y1, double x2, double y2 )
+{
+	vector< pair_doub > tt;
+	tt.push_back( make_pair( x1, y1 ) );
+	tt.push_back( make_pair( x2, y2 ) );
+	data.push_back( tt );
+}
+
 pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, recog_debug_callback *recog_debug, int gray_step )
 {
 	int next_level = find_next_level( found_nums, gray_step );
@@ -927,47 +1007,70 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	}
 
 	const int best_level = fine_best_level( found_nums );
-	assert( best_level != -1 );
-	const found_number& best_number = found_nums[ best_level ];
-	// рисуем квадрат номера
-	Mat num_rect_image = image.clone();
-	for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
+	if ( best_level != -1 )
 	{
-		const figure& cur_fig = best_number.figs[ nn ];
-		rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
-	}
-	recog_debug->out_image( num_rect_image );
+		assert( best_level != -1 );
+		const found_number& best_number = found_nums[ best_level ];
 
-	const vector< figure >& figs = best_number.figs;
-	if ( figs.size() == 6 ) // ищем регион только если у нас есть все 6 символов
-	{
-		int sum_dist = 0;
-		for ( int nn = 5; nn >= 1; --nn )
+		// рисуем квадрат номера
+		Mat num_rect_image = image.clone();
+		for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
 		{
-			sum_dist += figs.at( nn ).center().first - figs.at( nn - 1 ).center().first;
+			const figure& cur_fig = best_number.figs[ nn ];
+			rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
-		// средняя дистанция между символами
-		const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
-		const double koef_height = 0.76; // отношение высоты буквы к цифре
-		// средняя высота буквы
-		const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
-			+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
-		const double div_sym_hei_to_dis = avarage_distance / avarage_height;
-		const double koef_move_by_2_sym_reg = 1.06;
-		if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
+		recog_debug->out_image( num_rect_image );
+
+		const vector< figure >& figs = best_number.figs;
+		if ( figs.size() == 6 ) // ищем регион только если у нас есть все 6 символов
 		{
-			// точно 2-х символьный регион и угол наклона 0
+			int sum_dist = 0;
+			for ( int nn = 5; nn >= 1; --nn )
+			{
+				sum_dist += figs.at( nn ).center().first - figs.at( nn - 1 ).center().first;
+			}
+			// средняя дистанция между символами
+			const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
+			const double koef_height = 0.76; // отношение высоты буквы к цифре
+			// средняя высота буквы
+			const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
+				+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
+			const double div_sym_hei_to_dis = avarage_distance / avarage_height;
+			const double koef_move_by_2_sym_reg = 1.06;
+			if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
+			{
+				// точно 2-х символьный регион и угол наклона 0
+			}
+			else
+			{
+				// угол наклона номера, если у нас 2-х символьный регион
+				const double angle_2_sym_reg = div_sym_hei_to_dis > koef_move_by_2_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_2_sym_reg ) * 180. / 3.14;
+				const double koef_move_by_3_sym_reg = 0.96;
+				// угол наклона номера, если у нас 3-х символьный регион
+				const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg ) * 180. / 3.14;
+			}
+			vector< vector< pair_doub > > move_reg_by_2_sym_reg;
+			fill_reg( move_reg_by_2_sym_reg, 6.6656, -0.3219, 7.4363, -0.2998 );
+			fill_reg( move_reg_by_2_sym_reg, 5.5061, -0.1560, 6.2767, -0.1338 );
+			fill_reg( move_reg_by_2_sym_reg, 4.5016, -0.1991, 5.2721, -0.1769 );
+			fill_reg( move_reg_by_2_sym_reg, 3.4733, -0.2102, 4.2440, -0.1880 );
+			fill_reg( move_reg_by_2_sym_reg, 2.3332, -0.3802, 3.1039, -0.3580 );
+			fill_reg( move_reg_by_2_sym_reg, 1.3064, -0.4123, 2.0770, -0.3901 );
+
+			vector< vector< pair_doub > > move_reg_by_3_sym_reg;
+			fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
+			fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
+			fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
+			fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
+			fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
+			fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
 		}
-		else
-		{
-			// угол наклона номера, если у нас 2-х символьный регион
-			const double angle_2_sym_reg = div_sym_hei_to_dis > koef_move_by_2_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_2_sym_reg ) * 180. / 3.14;
-			const double koef_move_by_3_sym_reg = 0.96;
-			// угол наклона номера, если у нас 3-х символьный регион
-			const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg ) * 180. / 3.14;
-		}
+		return best_number.to_pair();
 	}
-	return best_number.to_pair();
+	else
+	{
+		return make_pair( string(), 0 );
+	}
 }
 
 pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_debug, int gray_step )
@@ -1036,51 +1139,6 @@ pair< string, int > read_number_by_level( const Mat& image, int gray_level, reco
 	}
 }
 
-// бьем картинку на фигуры
-vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
-{
-	vector< figure > ret;
-	ret.reserve( 1000 );
-	for ( int nn = 0; nn < mat.rows; ++nn )
-	{
-		for ( int mm = 0; mm < mat.cols; ++mm )
-		{
-			if ( mat.at< unsigned char >( nn, mm ) == 0 )
-			{
-				figure fig_to_create;
-				add_pixel_as_spy( nn, mm, mat, fig_to_create );
-				if ( fig_to_create.is_valid() )
-				{
-					// проверяем что высота больше ширины
-					if ( fig_to_create.width() < fig_to_create.height() )
-					{
-						if ( fig_to_create.width() > 4 )
-						{
-							if ( fig_to_create.height() / fig_to_create.width() < 4 )
-							{
-								ret.push_back( fig_to_create );
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	// отрисовываем найденные фигуры
-	if ( !ret.empty() )
-	{
-		Mat colored_mat( mat.size(), CV_8UC3 );
-		cvtColor( mat, colored_mat, CV_GRAY2RGB );
-		for ( size_t nn = 0; nn < ret.size(); ++nn )
-		{
-			rectangle( colored_mat, Point( ret[ nn ].left(), ret[ nn ].top() ), Point( ret[ nn ].right(), ret[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
-		}
-		recog_debug->out_image( colored_mat );
-	}
-	sort( ret.begin(), ret.end(), less_by_left_pos );
-	return ret;
-}
-
 // вырезаем одиночные пиксели
 void remove_single_pixels( Mat& mat )
 {
@@ -1110,24 +1168,6 @@ void remove_single_pixels( Mat& mat )
 			}
 		}
 	}
-}
-
-Mat create_binary_mat_by_level( const Mat& input, int gray_level )
-{
-	Mat gray( input.size(), CV_8U );
-	if ( input.channels() == 1 )
-	{
-		gray = input;
-	}
-	else if ( input.channels() == 3 )
-	{
-		cvtColor( input, gray, CV_RGB2GRAY );
-	}
-	else
-	{
-		assert( !"не поддерживаемое количество каналов" );
-	}
-	return gray > gray_level;
 }
 
 vector< found_number > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
