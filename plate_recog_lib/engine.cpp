@@ -20,6 +20,14 @@ public:
 		, m_too_big( false )
 	{
 	}
+	figure( pair_int center, pair_int size )
+		: m_left( center.first - size.first / 2 - 1 )
+		, m_right( center.first + size.first / 2 + 1 )
+		, m_top( center.second - size.second / 2 - 1 )
+		, m_bottom( center.second + size.second / 2 + 1 )
+		, m_too_big( false )
+	{
+	}
 	int width() const
 	{
 		return m_right - m_left;
@@ -142,19 +150,29 @@ struct found_number
 
 vector< found_number > read_number_impl( const Mat& image, int grey_level, recog_debug_callback *recog_debug );
 
-inline pair_int operator-( const pair_int& lh, const pair_int& rh )
+inline pair_int operator - ( const pair_int& lh, const pair_int& rh )
 {
 	return make_pair( lh.first - rh.first, lh.second - rh.second );
 }
 
-inline pair_int operator+( const pair_int& lh, const pair_int& rh )
+inline pair_int operator + ( const pair_int& lh, const pair_int& rh )
 {
 	return make_pair( lh.first + rh.first, lh.second + rh.second );
 }
 
-inline pair_int operator*( const pair_int& lh, const double& koef )
+inline pair_int operator * ( const pair_int& lh, const double& koef )
 {
 	return make_pair( static_cast< int >( static_cast< double >( lh.first ) * koef ), static_cast< int >( static_cast< double >( lh.second ) * koef ) );
+}
+
+inline pair_int operator / ( const pair_int& lh, const int& koef )
+{
+	return make_pair( lh.first / koef, lh.second / koef );
+}
+
+inline pair_doub operator * ( const pair_doub& lh, const double& koef )
+{
+	return make_pair( static_cast< double >( lh.first * koef ), static_cast< double >( lh.second * koef ) );
 }
 
 // Рассчитываем центры символов
@@ -617,6 +635,7 @@ vector< figure_group > make_groups( vector< figure >& figs )
 			{
 				if ( figs[ mm ].left() > figs[ nn ].left() )
 				{
+					// угол между левыми-нижними углами фигуры
 					const double angle = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - figs[ nn ].left() ), static_cast< double >( figs[ mm ].bottom() - figs[ nn ].bottom() ) );
 					bool found = false;
 					for ( size_t kk = 0; kk < cur_fig_groups.size(); ++kk )
@@ -987,6 +1006,137 @@ void fill_reg( vector< vector< pair_doub > >& data, double x1, double y1, double
 	data.push_back( tt );
 }
 
+void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height )
+{
+	const figure ff( reg_center, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
+	best_number.figs.push_back( ff );
+	const pair< char, double > sym_sym = find_sym( true, ff, etal );
+	if ( sym_sym.first != 0 )
+	{
+		best_number.number += sym_sym.first;
+	}
+	else
+	{
+		best_number.number += '?';
+	}
+}
+
+void search_region( found_number& best_number, const Mat& etal )
+{
+	const vector< figure >& figs = best_number.figs;
+	if ( figs.size() != 6 ) // ищем регион только если у нас есть все 6 символов
+	{
+		return;
+	}
+
+	int sum_dist = 0;
+	for ( int nn = 5; nn >= 1; --nn )
+	{
+		sum_dist += figs.at( nn ).center().first - figs.at( nn - 1 ).center().first;
+	}
+	// средняя дистанция между символами
+	const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
+	const double koef_height = 0.76; // отношение высоты буквы к цифре
+	// средняя высота буквы
+	const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
+		+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
+	const double div_sym_hei_to_dis = avarage_distance / avarage_height;
+	const double koef_move_by_2_sym_reg = 1.06;
+/*	if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
+	{
+		// точно 2-х символьный регион и угол наклона 0
+	}
+	else
+	{*/
+		// угол наклона номера, если у нас 2-х символьный регион
+		const double angle_2_sym_reg = div_sym_hei_to_dis > koef_move_by_2_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_2_sym_reg );
+		const double cos_angle_2_sym_reg = cos( angle_2_sym_reg );
+/*		const double koef_move_by_3_sym_reg = 0.96;
+		// угол наклона номера, если у нас 3-х символьный регион
+		const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg );
+		const double cos_angle_3_sym_reg = cos( angle_3_sym_reg );*/
+		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
+		vector< vector< pair_doub > > move_reg_by_2_sym_reg;
+		fill_reg( move_reg_by_2_sym_reg, 6.7656, -0.4219, 7.5363, -0.3998 );
+		fill_reg( move_reg_by_2_sym_reg, 5.6061, -0.2560, 6.3767, -0.2338 );
+		fill_reg( move_reg_by_2_sym_reg, 4.6016, -0.2991, 5.3721, -0.2769 );
+		fill_reg( move_reg_by_2_sym_reg, 3.5733, -0.3102, 4.3440, -0.2880 );
+		fill_reg( move_reg_by_2_sym_reg, 2.4332, -0.4802, 3.2039, -0.4580 );
+		fill_reg( move_reg_by_2_sym_reg, 1.4064, -0.5123, 2.1770, -0.4901 );
+
+		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
+/*		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
+		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
+		fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
+		fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
+		fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
+		fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
+		fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );*/
+
+		// ищем угол наклона по высоте (считаем среднее между не соседними фигурами 0-4, 0-5, 1-3)
+		vector< pair_int > index_fig_to_angle;
+		index_fig_to_angle.push_back( make_pair( 0, 4 ) );
+		index_fig_to_angle.push_back( make_pair( 0, 5 ) );
+		index_fig_to_angle.push_back( make_pair( 1, 3 ) );
+		double avarage_angle = 0.; // средний угол наклона номера
+		int move_by_y = 0; // номер наклонен вверх или вниз
+		for ( size_t nn = 0; nn < index_fig_to_angle.size(); ++nn )
+		{
+			const pair_int& cur_in = index_fig_to_angle.at( nn );
+			avarage_angle += atan( static_cast< double >( figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second ) / static_cast< double >( figs[ cur_in.first ].center().first - figs[ cur_in.second ].center().first ) );
+			move_by_y += figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second;
+		}
+		avarage_angle = avarage_angle / static_cast< double >( index_fig_to_angle.size() );
+
+		// перемножаем все коэффициенты что бы получить реальное значение смещения в пикселях
+		for ( size_t nn = 0; nn < move_reg_by_2_sym_reg.size(); ++nn )
+		{
+			for ( size_t mm = 0; mm < move_reg_by_2_sym_reg[ nn ].size(); ++mm )
+			{
+				move_reg_by_2_sym_reg[ nn ][ mm ].first = move_reg_by_2_sym_reg[ nn ][ mm ].first * avarage_height * cos_angle_2_sym_reg;
+				const double angle_offset = sin( avarage_angle ) * move_reg_by_2_sym_reg[ nn ][ mm ].first;
+				move_reg_by_2_sym_reg[ nn ][ mm ].second = move_reg_by_2_sym_reg[ nn ][ mm ].second * avarage_height + angle_offset;
+			}
+		}
+/*		for ( size_t nn = 0; nn < move_reg_by_3_sym_reg.size(); ++nn )
+		{
+			for ( size_t mm = 0; mm < move_reg_by_3_sym_reg[ nn ].size(); ++mm )
+			{
+				move_reg_by_3_sym_reg[ nn ][ mm ] = move_reg_by_3_sym_reg[ nn ][ mm ] * avarage_height * cos_angle_3_sym_reg;
+			}
+		}*/
+
+		// рисуем позиции 2-х символьного региона
+		const size_t figs_size = figs.size();
+		pair_int sum_first( 0, 0 );
+		pair_int sum_second( 0, 0 );
+		for ( size_t nn = 0; nn < figs_size; ++nn )
+		{
+			sum_first = sum_first + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 0 ].first ), static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 0 ].second ) );
+			sum_second = sum_second + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 1 ].first ), static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 1 ].second ) );
+		}
+		sum_first = sum_first / 6;
+		sum_second = sum_second / 6;
+
+		add_region( best_number, etal, sum_first, avarage_height );
+		add_region( best_number, etal, sum_second, avarage_height );
+
+/*		const figure ff( sum_first, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
+		best_number.figs.push_back( ff );
+		const pair< char, double > sym_sym_f = find_sym( true, ff, etal );
+		if ( sym_sym_f.first != 0 )
+		{
+
+		}
+		else
+		{
+		}
+		const figure fs( sum_second, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
+		const pair< char, double > sym_sym_s = find_sym( true, fs, etal );
+		best_number.figs.push_back( fs );*/
+//	}
+}
+
 pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, recog_debug_callback *recog_debug, int gray_step )
 {
 	int next_level = find_next_level( found_nums, gray_step );
@@ -1010,7 +1160,8 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	if ( best_level != -1 )
 	{
 		assert( best_level != -1 );
-		const found_number& best_number = found_nums[ best_level ];
+		found_number& best_number = found_nums[ best_level ];
+		search_region( best_number, create_binary_mat_by_level( image, best_level ) );
 
 		// рисуем квадрат номера
 		Mat num_rect_image = image.clone();
@@ -1021,50 +1172,8 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 		}
 		recog_debug->out_image( num_rect_image );
 
-		const vector< figure >& figs = best_number.figs;
-		if ( figs.size() == 6 ) // ищем регион только если у нас есть все 6 символов
-		{
-			int sum_dist = 0;
-			for ( int nn = 5; nn >= 1; --nn )
-			{
-				sum_dist += figs.at( nn ).center().first - figs.at( nn - 1 ).center().first;
-			}
-			// средняя дистанция между символами
-			const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
-			const double koef_height = 0.76; // отношение высоты буквы к цифре
-			// средняя высота буквы
-			const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
-				+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
-			const double div_sym_hei_to_dis = avarage_distance / avarage_height;
-			const double koef_move_by_2_sym_reg = 1.06;
-			if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
-			{
-				// точно 2-х символьный регион и угол наклона 0
-			}
-			else
-			{
-				// угол наклона номера, если у нас 2-х символьный регион
-				const double angle_2_sym_reg = div_sym_hei_to_dis > koef_move_by_2_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_2_sym_reg ) * 180. / 3.14;
-				const double koef_move_by_3_sym_reg = 0.96;
-				// угол наклона номера, если у нас 3-х символьный регион
-				const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg ) * 180. / 3.14;
-			}
-			vector< vector< pair_doub > > move_reg_by_2_sym_reg;
-			fill_reg( move_reg_by_2_sym_reg, 6.6656, -0.3219, 7.4363, -0.2998 );
-			fill_reg( move_reg_by_2_sym_reg, 5.5061, -0.1560, 6.2767, -0.1338 );
-			fill_reg( move_reg_by_2_sym_reg, 4.5016, -0.1991, 5.2721, -0.1769 );
-			fill_reg( move_reg_by_2_sym_reg, 3.4733, -0.2102, 4.2440, -0.1880 );
-			fill_reg( move_reg_by_2_sym_reg, 2.3332, -0.3802, 3.1039, -0.3580 );
-			fill_reg( move_reg_by_2_sym_reg, 1.3064, -0.4123, 2.0770, -0.3901 );
+		imwrite( "C:\\imgs\\debug\\0.png", num_rect_image );
 
-			vector< vector< pair_doub > > move_reg_by_3_sym_reg;
-			fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
-			fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
-			fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
-			fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
-			fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
-			fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
-		}
 		return best_number.to_pair();
 	}
 	else
@@ -1128,15 +1237,7 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 pair< string, int > read_number_by_level( const Mat& image, int gray_level, recog_debug_callback *recog_debug )
 {
 	const vector< found_number > fn = read_number_impl( image, gray_level, recog_debug );
-	if ( fn.empty() )
-	{
-		return make_pair( string(), 0 );
-	}
-	else
-	{
-		const found_number best_num = find_best_number_by_weight( fn );
-		return make_pair( best_num.number, best_num.weight );
-	}
+	return fn.empty() ? make_pair( string(), 0 ) : find_best_number_by_weight( fn ).to_pair();
 }
 
 // вырезаем одиночные пиксели
