@@ -1225,8 +1225,6 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 		}
 		recog_debug->out_image( num_rect_image );
 
-		imwrite( "C:\\imgs\\debug\\0.png", num_rect_image );
-
 		return best_number.to_pair();
 	}
 	else
