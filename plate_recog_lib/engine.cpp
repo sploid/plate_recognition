@@ -402,9 +402,13 @@ pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal )
 	return ret;
 }
 
-
-void add_pixel_as_spy( int nn, int mm, Mat& mat, figure& fig )
+// рекурсивно выбираем пиксели что бы получить контур, ограниченный белыми пикселями
+void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int bottom_border = -1 )
 {
+	if ( bottom_border == -1 ) // нижняя граница поиска
+	{
+		bottom_border = mat.rows;
+	}
 	static vector< pair_int > points_dublicate;
 	static vector< pair_int > pix_around( 4 );
 	static bool init = false;
@@ -423,11 +427,11 @@ void add_pixel_as_spy( int nn, int mm, Mat& mat, figure& fig )
 	}
 
 
-	fig.add_point( pair_int( nn, mm ) );
+	fig.add_point( pair_int( row, col ) );
 	points_dublicate.clear();
-	points_dublicate.push_back( make_pair( nn, mm ) );
+	points_dublicate.push_back( make_pair( row, col ) );
 	// что бы не зациклилось
-	mat.at< unsigned char >( nn, mm ) = 255;
+	mat.at< unsigned char >( row, col ) = 255;
 	size_t cur_index = 0;
 	while ( cur_index < points_dublicate.size() )
 	{
@@ -438,7 +442,7 @@ void add_pixel_as_spy( int nn, int mm, Mat& mat, figure& fig )
 		{
 			int curr_pix_a[ 2 ] = { pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm };
 //			const std_pair_int cur_pix( make_pair( pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm ) );
-			if ( curr_pix_a[ 0 ] >= 0 && curr_pix_a[ 0 ] < mat.rows
+			if ( curr_pix_a[ 0 ] >= 0 && curr_pix_a[ 0 ] < bottom_border
 				&& curr_pix_a[ 1 ] >= 0 && curr_pix_a[ 1 ] < mat.cols )
 			{
 				if ( mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) == 0 )
@@ -1006,19 +1010,81 @@ void fill_reg( vector< vector< pair_doub > >& data, double x1, double y1, double
 	data.push_back( tt );
 }
 
+// ищем ближайшую черную точку
+pair_int search_nearest_black( const Mat& etal, const pair_int& center )
+{
+	pair_int dist_x( center.first, center.first );
+	pair_int dist_y( center.second, center.second );
+	for (;;)
+	{
+		for ( int nn = dist_x.first; nn <= dist_x.second; ++nn )
+		{
+			for ( int mm = dist_y.first; mm <= dist_y.second; ++mm )
+			{
+				const unsigned char cc = etal.at< unsigned char >( mm, nn );
+				if ( cc != 255 )
+				{
+					assert( cc == 0 );
+					return pair_int( nn, mm );
+				}
+			}
+		}
+		--dist_x.first;
+		++dist_x.second;
+		--dist_y.first;
+		++dist_y.second;
+		if ( dist_x.first < 0 || dist_x.second >= etal.cols
+			|| dist_y.first < 0 || dist_y.second >= etal.rows )
+		{
+			return pair_int( -1, -1 );
+		}
+	}
+}
+
 void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height )
 {
-	const figure ff( reg_center, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
-	best_number.figs.push_back( ff );
-	const pair< char, double > sym_sym = find_sym( true, ff, etal );
-	if ( sym_sym.first != 0 )
+	const pair_int nearest_black = search_nearest_black( etal, reg_center );
+	if ( nearest_black.first != -1
+		|| nearest_black.second != -1 )
 	{
-		best_number.number += sym_sym.first;
+		figure top_border_fig;
+		Mat to_search = etal.clone();
+		// Ищем контуры по нижней границе
+		add_pixel_as_spy( nearest_black.second, nearest_black.first, to_search, top_border_fig, nearest_black.second + 1 );
+		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
+		{
+			Mat to_contur = etal.clone();
+			figure conture_fig;
+			add_pixel_as_spy( nearest_black.second, nearest_black.first, to_contur, conture_fig, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
+			// если у нас рамочка наезжает на цифры, то у нас будет очень широкая фигура
+			if ( conture_fig.width() >= static_cast< int >( avarage_height ) )
+			{
+				conture_fig = figure( reg_center, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
+			}
+			best_number.figs.push_back( conture_fig );
+			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal );
+			if ( sym_sym.first != 0 )
+			{
+				best_number.number += sym_sym.first;
+			}
+			else
+			{
+				best_number.number += '?';
+			}
+		}
+		else
+		{
+			// не нашли верхней границы
+			best_number.number += '?';
+		}
 	}
 	else
 	{
 		best_number.number += '?';
 	}
+
+	const figure ff( nearest_black, pair_int( 0, 0 ) );
+	best_number.figs.push_back( ff );
 }
 
 void search_region( found_number& best_number, const Mat& etal )
@@ -1118,22 +1184,9 @@ void search_region( found_number& best_number, const Mat& etal )
 		sum_first = sum_first / 6;
 		sum_second = sum_second / 6;
 
+		// ищем цифры 2-х символьного региона
 		add_region( best_number, etal, sum_first, avarage_height );
 		add_region( best_number, etal, sum_second, avarage_height );
-
-/*		const figure ff( sum_first, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
-		best_number.figs.push_back( ff );
-		const pair< char, double > sym_sym_f = find_sym( true, ff, etal );
-		if ( sym_sym_f.first != 0 )
-		{
-
-		}
-		else
-		{
-		}
-		const figure fs( sum_second, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
-		const pair< char, double > sym_sym_s = find_sym( true, fs, etal );
-		best_number.figs.push_back( fs );*/
 //	}
 }
 
