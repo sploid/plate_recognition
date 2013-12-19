@@ -402,9 +402,13 @@ pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal )
 	return ret;
 }
 
-// рекурсивно выбираем пиксели что бы получить контур, ограниченный белыми пикселями
-void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int bottom_border = -1 )
+// выбираем пиксели что бы получить контур, ограниченный белыми пикселями
+void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border = -1, int bottom_border = -1 )
 {
+	if ( top_border == -1 ) // верняя граница поиска
+	{
+		top_border = 0;
+	}
 	if ( bottom_border == -1 ) // нижняя граница поиска
 	{
 		bottom_border = mat.rows;
@@ -442,7 +446,7 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int bottom_borde
 		{
 			int curr_pix_a[ 2 ] = { pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm };
 //			const std_pair_int cur_pix( make_pair( pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm ) );
-			if ( curr_pix_a[ 0 ] >= 0 && curr_pix_a[ 0 ] < bottom_border
+			if ( curr_pix_a[ 0 ] >= top_border && curr_pix_a[ 0 ] < bottom_border
 				&& curr_pix_a[ 1 ] >= 0 && curr_pix_a[ 1 ] < mat.cols )
 			{
 				if ( mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) == 0 )
@@ -1050,16 +1054,21 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 		figure top_border_fig;
 		Mat to_search = etal.clone();
 		// Ищем контуры по нижней границе
-		add_pixel_as_spy( nearest_black.second, nearest_black.first, to_search, top_border_fig, nearest_black.second + 1 );
+		add_pixel_as_spy( nearest_black.second, nearest_black.first, to_search, top_border_fig, -1, nearest_black.second + 1 );
 		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
 		{
 			Mat to_contur = etal.clone();
 			figure conture_fig;
-			add_pixel_as_spy( nearest_black.second, nearest_black.first, to_contur, conture_fig, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
+			add_pixel_as_spy( nearest_black.second, nearest_black.first, to_contur, conture_fig, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
 			// если у нас рамочка наезжает на цифры, то у нас будет очень широкая фигура
 			if ( conture_fig.width() >= static_cast< int >( avarage_height ) )
 			{
-				conture_fig = figure( reg_center, pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
+				// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
+				Mat to_stable = etal.clone();
+				figure short_fig;
+				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
+				add_pixel_as_spy( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
+				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
 			}
 			best_number.figs.push_back( conture_fig );
 			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal );
@@ -1082,9 +1091,6 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 	{
 		best_number.number += '?';
 	}
-
-	const figure ff( nearest_black, pair_int( 0, 0 ) );
-	best_number.figs.push_back( ff );
 }
 
 void search_region( found_number& best_number, const Mat& etal )
@@ -1224,7 +1230,6 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 			rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
 		recog_debug->out_image( num_rect_image );
-
 		return best_number.to_pair();
 	}
 	else
