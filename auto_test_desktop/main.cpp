@@ -4,7 +4,7 @@
 
 #include <opencv2/opencv.hpp>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -52,9 +52,9 @@ int main( int argc, char** argv )
 	const string image_folder( argv[ 1 ] );
 	cout << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
 	// грузим список картинок
-#ifdef WIN32
-	WIN32_FIND_DATA find_file_data;
-	HANDLE h_find = FindFirstFile( ( image_folder  + "\\*" ).c_str(), &find_file_data );
+#ifdef _WIN32
+	WIN32_FIND_DATAA find_file_data;
+	HANDLE h_find = FindFirstFileA( ( image_folder  + "\\*" ).c_str(), &find_file_data );
 	if ( INVALID_HANDLE_VALUE == h_find ) 
 	{
 		cout << "files not found";
@@ -69,7 +69,7 @@ int main( int argc, char** argv )
 			sum += process_file( image_folder, next_file_name );
 		}
 	}
-	while ( FindNextFile(h_find, &find_file_data) != 0 );
+	while ( FindNextFileA(h_find, &find_file_data) != 0 );
 	FindClose( h_find );
 	cout << "sum: " << sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
 	_getch();
