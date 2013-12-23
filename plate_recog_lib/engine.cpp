@@ -579,30 +579,58 @@ void groups_remove_to_small( vector< figure_group > & groups )
 	}
 }
 
-// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
-void remote_too_long_figs_from_first( vector< figure_group > & groups )
+// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не выше 3 * высота первого элемента
+void figs_remote_too_long_by_y_from_first( vector< figure_group > & groups )
 {
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		if ( groups[ nn ].size() > 2 )
 		{
 			const figure& first_fig = groups[ nn ].at( 0 );
-			const double width_first = first_fig.right() - first_fig.left();
+			const double height_first = first_fig.height();
+			assert( first_fig.height() > 0. );
+			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
+			{
+				const figure& cur_fig = groups[ nn ][ mm ];
+				if ( abs( double( cur_fig.top() - first_fig.top() ) / 3. ) > height_first )
+				{
+					groups[ nn ].erase( groups[ nn ].begin() + mm );
+				}
+			}
+		}
+	}
+	// выкидываем группы, где меньше 3-х элементов
+	groups_remove_to_small( groups );
+}
+
+// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
+void figs_remote_too_long_by_x_from_first( vector< figure_group > & groups )
+{
+	for ( size_t nn = 0; nn < groups.size(); ++nn )
+	{
+		if ( groups[ nn ].size() > 2 )
+		{
+			const figure& first_fig = groups[ nn ].at( 0 );
+			const double width_first = first_fig.width();
 			assert( first_fig.width() > 0. );
 			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
 			{
 				const figure& cur_fig = groups[ nn ][ mm ];
 				if ( double( cur_fig.left() - first_fig.left() ) / 7. > width_first )
 				{
+					// @todo: тут можно оптимизировать и в начале найти самую допустимо-дальнюю, а уже затем чистить список
 					groups[ nn ].erase( groups[ nn ].begin() + mm );
 				}
 				else
 				{
+					// тут брик, т.к. фигуры отсортированы по оси х и все предыдущие будут левее
 					break;
 				}
 			}
 		}
 	}
+	// выкидываем группы, где меньше 3-х элементов
+	groups_remove_to_small( groups );
 }
 
 void figs_remove_invalid_from_first_by_size( vector< figure_group > & groups )
@@ -626,6 +654,8 @@ void figs_remove_invalid_from_first_by_size( vector< figure_group > & groups )
 			}
 		}
 	}
+	// выкидываем группы, где меньше 3-х элементов
+	groups_remove_to_small( groups );
 }
 
 // по отдельным фигурам создаем группы фигур
@@ -691,6 +721,17 @@ vector< figure_group > make_groups( vector< figure >& figs )
 				sort( cur_fig_groups[ mm ].second.begin(), cur_fig_groups[ mm ].second.end(), fig_less_left );
 				groups.push_back( cur_fig_groups[ mm ].second );
 			}
+		}
+	}
+	// выкидываем все группы, у которых угол больше 30 градусов
+	for ( int nn = groups.size() - 1; nn >= 0; --nn )
+	{
+		const double xx = abs( static_cast< double >( groups.at( nn ).at( 0 ).left() - groups.at( nn ).at( 1 ).left() ) );
+		const double yy = abs( static_cast< double >( groups.at( nn ).at( 0 ).bottom() - groups.at( nn ).at( 1 ).bottom() ) );
+		const double angle_to_fig = abs( 57.2957795 * atan2( yy, xx ) );
+		if ( angle_to_fig > 30. && angle_to_fig < 330. )
+		{
+			groups.erase( groups.begin() + nn );
 		}
 	}
 	return groups;
@@ -1108,25 +1149,24 @@ void search_region( found_number& best_number, const Mat& etal )
 	}
 	// средняя дистанция между символами
 	const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
-	const double koef_height = 0.76; // отношение высоты буквы к цифре
+	const double koef_height = 0.76; // отношение высоты буквы к высоте цифры
 	// средняя высота буквы
 	const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
 		+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
 	const double div_sym_hei_to_dis = avarage_distance / avarage_height;
 	const double koef_move_by_2_sym_reg = 1.06;
-/*	if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
-	{
-		// точно 2-х символьный регион и угол наклона 0
-	}
-	else
-	{*/
-		// угол наклона номера, если у нас 2-х символьный регион
-		const double angle_2_sym_reg = div_sym_hei_to_dis > koef_move_by_2_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_2_sym_reg );
-		const double cos_angle_2_sym_reg = cos( angle_2_sym_reg );
-/*		const double koef_move_by_3_sym_reg = 0.96;
-		// угол наклона номера, если у нас 3-х символьный регион
-		const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg );
-		const double cos_angle_3_sym_reg = cos( angle_3_sym_reg );*/
+	// смещение относительно расстояния между первым и вторым символом
+	double koef_by_x = ( ( figs.at( 5 ).center().first - figs.at( 0 ).center().first ) / avarage_height ) / 5.3496;
+// 	if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
+// 	{
+// 		// точно 2-х символьный регион и угол наклона 0
+// 	}
+// 	else
+// 	{
+// 		const double koef_move_by_3_sym_reg = 0.96;
+// 		// угол наклона номера, если у нас 3-х символьный регион
+// 		const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg );
+// 		const double cos_angle_3_sym_reg = cos( angle_3_sym_reg );
 		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
 		vector< vector< pair_doub > > move_reg_by_2_sym_reg;
 		fill_reg( move_reg_by_2_sym_reg, 6.7656, -0.4219, 7.5363, -0.3998 );
@@ -1136,47 +1176,48 @@ void search_region( found_number& best_number, const Mat& etal )
 		fill_reg( move_reg_by_2_sym_reg, 2.4332, -0.4802, 3.2039, -0.4580 );
 		fill_reg( move_reg_by_2_sym_reg, 1.4064, -0.5123, 2.1770, -0.4901 );
 
-		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
-/*		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
-		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
-		fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
-		fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
-		fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
-		fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
-		fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );*/
+// 		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
+// 		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
+// 		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
+// 		fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
+// 		fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
+// 		fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
+// 		fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
+// 		fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
 
 		// ищем угол наклона по высоте (считаем среднее между не соседними фигурами 0-4, 0-5, 1-3)
 		vector< pair_int > index_fig_to_angle;
 		index_fig_to_angle.push_back( make_pair( 0, 4 ) );
 		index_fig_to_angle.push_back( make_pair( 0, 5 ) );
 		index_fig_to_angle.push_back( make_pair( 1, 3 ) );
-		double avarage_angle = 0.; // средний угол наклона номера
+		double avarage_angle_by_y = 0.; // средний угол наклона номера по оси У
 		int move_by_y = 0; // номер наклонен вверх или вниз
 		for ( size_t nn = 0; nn < index_fig_to_angle.size(); ++nn )
 		{
 			const pair_int& cur_in = index_fig_to_angle.at( nn );
-			avarage_angle += atan( static_cast< double >( figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second ) / static_cast< double >( figs[ cur_in.first ].center().first - figs[ cur_in.second ].center().first ) );
+			avarage_angle_by_y += atan( static_cast< double >( figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second ) / static_cast< double >( figs[ cur_in.first ].center().first - figs[ cur_in.second ].center().first ) );
 			move_by_y += figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second;
 		}
-		avarage_angle = avarage_angle / static_cast< double >( index_fig_to_angle.size() );
+		avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
+		const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
 
 		// перемножаем все коэффициенты что бы получить реальное значение смещения в пикселях
 		for ( size_t nn = 0; nn < move_reg_by_2_sym_reg.size(); ++nn )
 		{
 			for ( size_t mm = 0; mm < move_reg_by_2_sym_reg[ nn ].size(); ++mm )
 			{
-				move_reg_by_2_sym_reg[ nn ][ mm ].first = move_reg_by_2_sym_reg[ nn ][ mm ].first * avarage_height * cos_angle_2_sym_reg;
-				const double angle_offset = sin( avarage_angle ) * move_reg_by_2_sym_reg[ nn ][ mm ].first;
+				move_reg_by_2_sym_reg[ nn ][ mm ].first = move_reg_by_2_sym_reg[ nn ][ mm ].first * avarage_height * koef_by_x;
+				const double angle_offset = sin_avarage_angle_by_y * move_reg_by_2_sym_reg[ nn ][ mm ].first;
 				move_reg_by_2_sym_reg[ nn ][ mm ].second = move_reg_by_2_sym_reg[ nn ][ mm ].second * avarage_height + angle_offset;
 			}
 		}
-/*		for ( size_t nn = 0; nn < move_reg_by_3_sym_reg.size(); ++nn )
-		{
-			for ( size_t mm = 0; mm < move_reg_by_3_sym_reg[ nn ].size(); ++mm )
-			{
-				move_reg_by_3_sym_reg[ nn ][ mm ] = move_reg_by_3_sym_reg[ nn ][ mm ] * avarage_height * cos_angle_3_sym_reg;
-			}
-		}*/
+// 		for ( size_t nn = 0; nn < move_reg_by_3_sym_reg.size(); ++nn )
+// 		{
+// 			for ( size_t mm = 0; mm < move_reg_by_3_sym_reg[ nn ].size(); ++mm )
+// 			{
+// 				move_reg_by_3_sym_reg[ nn ][ mm ] = move_reg_by_3_sym_reg[ nn ][ mm ] * avarage_height * cos_angle_3_sym_reg;
+// 			}
+// 		}
 
 		// рисуем позиции 2-х символьного региона
 		const size_t figs_size = figs.size();
@@ -1230,6 +1271,9 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 			rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
 		recog_debug->out_image( num_rect_image );
+
+		imwrite("C:\\imgs\\debug\\0.png", num_rect_image);
+
 		return best_number.to_pair();
 	}
 	else
@@ -1267,6 +1311,7 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 			first_search_levels.push_back( nn );
 		}
 	}
+//	Проверить почему у мерина последняя цифра региона определилась не верно 
 
 	map< int, found_number > found_nums;
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
@@ -1338,13 +1383,11 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level, recog
 	// бьем по группам в зависимости от угла наклона элементов отностительно друг друга
 	vector< figure_group > groups = make_groups( figs );
 	// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
-	remote_too_long_figs_from_first( groups );
-	// выкидываем группы, где меньше 3-х элементов
-	groups_remove_to_small( groups );
+	figs_remote_too_long_by_x_from_first( groups );
+	// выкидываем элементы, которые слишком далеко по высоте от предыдущего
+	figs_remote_too_long_by_y_from_first( groups );
 	// выкидываем элементы, не пропорциональные первому элементу
 	figs_remove_invalid_from_first_by_size( groups );
-	// выкидываем группы, где меньше 3-х элементов
-	groups_remove_to_small( groups );
 	// Выкидываем группы, которые включают в себя другие группы
 	groups_remove_included( groups );
 	// сливаем пересекающиеся группы
