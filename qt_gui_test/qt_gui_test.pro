@@ -5,7 +5,14 @@ CONFIG(debug, debug|release) {
 }
 
 INCLUDEPATH += $$_PRO_FILE_PWD_/../plate_recog_lib
-LIBS += $${DESTDIR}/plate_recog_lib.lib
+win32 {
+	mingw {
+		LIBS += -L$${DESTDIR} \
+			-lplate_recog_lib
+	} else {
+		LIBS += $${DESTDIR}/plate_recog_lib.lib
+	}
+}
 QT += widgets
 
 FORMS += \
@@ -15,9 +22,5 @@ HEADERS = \
 SOURCES = \
 		main.cpp \
 		recog_test.cpp
-win32 {
-	QMAKE_CXXFLAGS += /MP
-	QMAKE_CXXFLAGS_WARN_ON = -W4
-}
 
 include(../opencv.pri)

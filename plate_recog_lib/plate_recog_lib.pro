@@ -15,10 +15,6 @@ HEADERS = \
 SOURCES = \
 		engine.cpp \
 		syms.cpp
-win32 {
-	QMAKE_CXXFLAGS += /MP
-	QMAKE_CXXFLAGS_WARN_ON = -W4
-}
 
 include(../opencv.pri)
 

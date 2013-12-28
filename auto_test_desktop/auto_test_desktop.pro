@@ -6,14 +6,17 @@ CONFIG(debug, debug|release) {
 
 CONFIG += console
 INCLUDEPATH += $$_PRO_FILE_PWD_/../plate_recog_lib
-LIBS += $${DESTDIR}/plate_recog_lib.lib
+win32 {
+	mingw {
+		LIBS += -L$${DESTDIR} \
+			-lplate_recog_lib
+	} else {
+		LIBS += $${DESTDIR}/plate_recog_lib.lib
+	}
+}
 QT -= gui
 
 SOURCES = \
 		main.cpp
-win32 {
-	QMAKE_CXXFLAGS += /MP
-	QMAKE_CXXFLAGS_WARN_ON = -W4
-}
 
 include(../opencv.pri)
