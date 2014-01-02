@@ -6,12 +6,12 @@
 #pragma warning( pop )
 #include <QCoreApplication>
 
+#include "sym_recog.h"
+
 using namespace std;
 using namespace cv;
 
 const int max_hidden_neuron = 500;
-const int data_width = 15;
-const int data_height = 22;
 
 vector< pair< char, Mat > > train_data( const std::string& image_folder )
 {

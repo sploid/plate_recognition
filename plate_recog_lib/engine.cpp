@@ -282,8 +282,20 @@ double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
 	return sum;
 }
 
+#include "sym_recog.h"
+
 pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal )
 {
+	if ( num )
+	{
+		Mat mm( etal, cv::Rect(fig.left(), fig.top(), fig.width(), fig.height()));
+		proc( mm );
+
+
+
+
+
+	}
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
 	{
