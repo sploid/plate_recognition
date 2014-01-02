@@ -134,7 +134,7 @@ const int data_height = 22;
 
 void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_index, int count_hidden )
 {
-	for ( int nn = 10; nn <= max_hidden_neuron; ++nn )
+	for ( int nn = layer_sizes.at< int >( layer_sizes.cols - 1 ); nn <= max_hidden_neuron; ++nn )
 	{
 		layer_sizes.at< int >( layer_index + 1 ) = nn;
 		if ( layer_index == count_hidden - 1 )
@@ -186,9 +186,13 @@ int main( int argc, char** argv )
 	}
 
 	assert( !configs.empty() );
+	int best_index = -1;
+	float best_diff = 100.;
 	for ( size_t cc = 0; cc < configs.size(); ++cc )
 	{
 		cout << configs.at( cc ) << endl;
+		bool have_invalid = false;
+		float diff_summ = 0.;
 		try
 		{
 			CvANN_MLP mlp( configs.at( cc ) );
@@ -202,12 +206,27 @@ int main( int argc, char** argv )
 				}
 				Mat pred_out;
 				mlp.predict( test_sample, pred_out );
-//				cout << evaluate( output, ll, pred_out ) << endl;
+				const float diff = evaluate( output, ll, pred_out );
+				if ( diff >= -0.5 )
+				{
+					diff_summ += diff;
+				}
+				else
+				{
+					have_invalid = true;
+				}
 			}
 		}
 		catch (const exception& e)
 		{
 			(void)e;
+			have_invalid = true;
+		}
+		if ( !have_invalid && ( best_index == -1 || best_diff > diff_summ ) )
+		{
+			best_index = cc;
+			best_diff = diff_summ;
 		}
 	}
+	cout << configs.at( best_index );
 }
