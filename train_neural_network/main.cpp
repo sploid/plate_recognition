@@ -1,33 +1,29 @@
-#include "engine.h"
-#include "syms.h"
-#include <iostream>
-#include <conio.h>
-
 #include <opencv2/opencv.hpp>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#pragma warning( push )
+#pragma warning( disable : 4127 4512 )
+#include <QDir>
+#pragma warning( pop )
+#include <QCoreApplication>
 
 using namespace std;
 using namespace cv;
 
-vector< pair< char, Mat > > train_data( const std::string& image_folder, int data_height, int data_width )
+const int max_hidden_neuron = 500;
+const int data_width = 15;
+const int data_height = 22;
+
+vector< pair< char, Mat > > train_data( const std::string& image_folder )
 {
 	vector< pair< char, Mat > > ret;
-#ifdef _WIN32
-	WIN32_FIND_DATAA find_file_data;
-	HANDLE h_find = FindFirstFileA( ( image_folder  + "\\*" ).c_str(), &find_file_data );
-	if ( INVALID_HANDLE_VALUE == h_find ) 
+	QDir image_dir( image_folder.c_str() );
+	if ( image_dir.exists() )
 	{
-		return ret;
-	}
-	do
-	{
-		if ( !( find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) )
+		const QStringList all_files = image_dir.entryList( QStringList() << "*.png" );
+		for ( int nn = 0; nn < all_files.size(); ++nn )
 		{
-			const string next_file_name = image_folder + "\\" + find_file_data.cFileName;
-			Mat next_mat( imread( next_file_name ) );
+			const QString& next_file_name = all_files.at( nn );
+			Mat next_mat( imread( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() ) );
 			Mat one_chan_gray;
 			if ( next_mat.channels() == 3 && next_mat.depth() == CV_MAT_DEPTH( CV_8U ) )
 			{
@@ -45,7 +41,7 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder, int dat
 				cv::resize(one_chan_gray, gray_sized, gray_sized.size() );
 				Mat gray_float( data_height, data_width, CV_32F );
 				gray_sized.convertTo( gray_float, CV_32F );
-				switch ( find_file_data.cFileName[ 0 ] )
+				switch ( next_file_name.toLocal8Bit().data()[ 0 ] )
 				{
 				case '0':
 				case '1':
@@ -57,22 +53,33 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder, int dat
 				case '7':
 				case '8':
 				case '9':
-					ret.push_back( make_pair( find_file_data.cFileName[ 0 ], gray_float ) );
+					ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], gray_float ) );
 				default:
 					break;
 				}
 			}
 			else
 			{
-				cout << "invalid image format: " << find_file_data.cFileName;
+				cout << "invalid image format: " << next_file_name.toLocal8Bit().data();
 			}
 		}
 	}
-	while ( FindNextFileA(h_find, &find_file_data) != 0 );
-	FindClose( h_find );
-#else
-#endif
 	return ret;
+}
+
+string path_to_save_train( const string& module_path )
+{
+	QString q_mod_path( QDir::fromNativeSeparators( QString::fromLocal8Bit( module_path.c_str() ) ) );
+	int index_separator = q_mod_path.lastIndexOf( "/" );
+	if ( index_separator != -1 )
+	{
+		q_mod_path.remove( index_separator, q_mod_path.size() - index_separator );
+	}
+	else
+	{
+		q_mod_path.clear();
+	}
+	return string( ( q_mod_path + "/neural_net.yml" ).toLocal8Bit().data() );
 }
 
 void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row )
@@ -128,10 +135,6 @@ float evaluate( const Mat& output, int output_row, const Mat& pred_out )
 	return ret;
 }
 
-const int max_hidden_neuron = 500;
-const int data_width = 15;
-const int data_height = 22;
-
 void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_index, int count_hidden )
 {
 	for ( int nn = layer_sizes.at< int >( layer_sizes.cols - 1 ); nn <= max_hidden_neuron; ++nn )
@@ -159,7 +162,7 @@ int main( int argc, char** argv )
 	// ищем оптимальное количество нейронов и уровней в невидимом слое
 	const string image_folder( argv[ 1 ] );
 	const int max_hidden_levels = 1;
-	const vector< pair< char, Mat > > t_data = train_data( image_folder, data_height, data_width );
+	const vector< pair< char, Mat > > t_data = train_data( image_folder );
 	if ( t_data.empty() )
 	{
 		cout << "input files not found";
@@ -229,4 +232,9 @@ int main( int argc, char** argv )
 		}
 	}
 	cout << configs.at( best_index );
+	// сохраняем наилучший результат в файл
+	CvANN_MLP mlp( configs.at( best_index ) );
+	mlp.train( input, output, weights );
+	FileStorage fs( path_to_save_train( argv[ 0 ] ), cv::FileStorage::WRITE );
+	mlp.write( *fs, "mlp" );
 }
