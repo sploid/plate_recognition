@@ -124,7 +124,7 @@ float evaluate( const Mat& output, int output_row, const Mat& pred_out )
 {
 	// проверяем правильный ли ответ
 	if ( search_max_val( output, output_row ) != search_max_val( pred_out, 0 ) )
-		return -1;
+		return -10.;
 
 	// находим смещение
 	float ret = 0.;
@@ -210,7 +210,7 @@ int main( int argc, char** argv )
 				Mat pred_out;
 				mlp.predict( test_sample, pred_out );
 				const float diff = evaluate( output, ll, pred_out );
-				if ( diff >= -0.5 )
+				if ( diff >= -1.7159 ) // http://answers.opencv.org/question/25965/opencv-neural-networks/?answer=26038#post-id-26038
 				{
 					diff_summ += diff;
 				}
