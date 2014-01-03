@@ -91,7 +91,7 @@ inline std::pair< char, double > proc( const cv::Mat& input )
 	{
 		try
 		{
-			FileStorage fs("C:\\dork\\plate_recognition\\other\\neural_net.yml", cv::FileStorage::READ);
+			FileStorage fs("C:\\soft\\plate_recognition\\other\\neural_net.yml", cv::FileStorage::READ);
 			FileNode fn = fs["mlp"];
 			if ( !fn.empty() )
 			{
@@ -118,24 +118,34 @@ inline std::pair< char, double > proc( const cv::Mat& input )
 		assert( !"govno" );
 	case 0:
 		ret_char = '0';
+		break;
 	case 1:
 		ret_char = '1';
+		break;
 	case 2:
 		ret_char = '2';
+		break;
 	case 3:
 		ret_char = '3';
+		break;
 	case 4:
 		ret_char = '4';
+		break;
 	case 5:
 		ret_char = '5';
+		break;
 	case 6:
 		ret_char = '6';
+		break;
 	case 7:
 		ret_char = '7';
+		break;
 	case 8:
 		ret_char = '8';
+		break;
 	case 9:
 		ret_char = '9';
+		break;
 	}
 	float min_diff = 100.;
 	for ( int nn = 0; nn < pred_out.cols; ++nn )

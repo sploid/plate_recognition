@@ -2,6 +2,8 @@
 #include <opencv2/opencv.hpp>
 #include <assert.h>
 #include "syms.h"
+#include "sym_recog.h"
+
 
 using namespace cv;
 using namespace std;
@@ -282,9 +284,7 @@ double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
 	return sum;
 }
 
-#include "sym_recog.h"
-
-pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal, const Mat& original )
+pair< char, double > find_sym_legacy( bool num, const figure& fig, const Mat& etal, const Mat& original )
 {
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
@@ -401,60 +401,35 @@ pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal, con
 		}
 	}
 	calcs_figs[ make_pair( num, fig ) ] = ret;
-
-
-	if ( num )
-	{
-		int left = fig.left() - 1;
-		int right = left + fig.width() + 2;
-		if ( fig.left() == 0 )
-		{
-			left = 0;
-			--right;
-		}
-		if ( right >= original.cols )
-		{
-			right = original.cols - 1;
-		}
-
-		int top = fig.top() - 1;
-		int bottom = top + fig.height() + 2;
-		if ( fig.top() == 0 )
-		{
-			top = 0;
-			--bottom;
-		}
-		if ( bottom >= original.rows )
-		{
-			bottom = original.rows - 1;
-		}
-
-/*		static vector< Rect > cache_figs;
-		static const Mat* cache_image = 0;
-		if ( cache_image != &original )
-		{
-			cache_figs.clear();
-			cache_image = &original;
-		}*/
-
-		const cv::Rect sym_border( left, top, right - left, bottom - top );
-/*		if ( find( cache_figs.begin(), cache_figs.end(), sym_border ) == cache_figs.end() )
-		{*/
-			Mat mm( original, sym_border );
-//			imwrite("C:\\imgs\\0.png", mm );
-			pair< char, double > proc_res = proc( mm );
-			return proc_res;
-/*			if ( pp != ret.first )
-			{
-				int t = 0;
-			}
-			cache_figs.push_back( sym_border );
-		}*/
-	}
-
-
 	return ret;
 }
+
+pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& etal, const Mat& original )
+{
+	const int left = fig.left();
+	int right = left + fig.width() + 1;
+	if ( right >= original.cols )
+	{
+		right = original.cols - 1;
+	}
+
+	const int top = fig.top();
+	int bottom = top + fig.height() + 1;
+	if ( bottom >= original.rows )
+	{
+		bottom = original.rows - 1;
+	}
+
+	const cv::Rect sym_border( left, top, right - left, bottom - top );
+	Mat mm( original, sym_border );
+	if ( !num )
+	{
+//		imwrite("C:\\imgs\\debug\\0.png", mm );
+		const pair< char, double > proc_res = proc( mm );
+		return proc_res;
+	}
+}
+
 
 // выбираем пиксели что бы получить контур, ограниченный белыми пикселями
 void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border = -1, int bottom_border = -1 )
@@ -856,7 +831,7 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const fi
 			&& procs_figs.find( next.fig ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
-			const pair< char, double > cc = find_sym( kk >= 1 && kk <= 3, next.fig, etal, original );
+			const pair< char, double > cc = find_sym_legacy( kk >= 1 && kk <= 3, next.fig, etal, original );
 			if ( cc.first != 0 )
 			{
 				next.pos_in_pis_index = kk;
@@ -1166,7 +1141,7 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
 			}
 			best_number.figs.push_back( conture_fig );
-			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal, original );
+			const pair< char, double > sym_sym = find_sym_legacy( true, conture_fig, etal, original );
 			if ( sym_sym.first != 0 )
 			{
 				best_number.number += sym_sym.first;
