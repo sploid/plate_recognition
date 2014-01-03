@@ -284,18 +284,8 @@ double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
 
 #include "sym_recog.h"
 
-pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal )
+pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal, const Mat& original )
 {
-	if ( num )
-	{
-		Mat mm( etal, cv::Rect(fig.left(), fig.top(), fig.width(), fig.height()));
-		proc( mm );
-
-
-
-
-
-	}
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
 	{
@@ -411,6 +401,58 @@ pair< char, double > find_sym( bool num, const figure& fig, const Mat& etal )
 		}
 	}
 	calcs_figs[ make_pair( num, fig ) ] = ret;
+
+
+	if ( num )
+	{
+		int left = fig.left() - 1;
+		int right = left + fig.width() + 2;
+		if ( fig.left() == 0 )
+		{
+			left = 0;
+			--right;
+		}
+		if ( right >= original.cols )
+		{
+			right = original.cols - 1;
+		}
+
+		int top = fig.top() - 1;
+		int bottom = top + fig.height() + 2;
+		if ( fig.top() == 0 )
+		{
+			top = 0;
+			--bottom;
+		}
+		if ( bottom >= original.rows )
+		{
+			bottom = original.rows - 1;
+		}
+
+/*		static vector< Rect > cache_figs;
+		static const Mat* cache_image = 0;
+		if ( cache_image != &original )
+		{
+			cache_figs.clear();
+			cache_image = &original;
+		}*/
+
+		const cv::Rect sym_border( left, top, right - left, bottom - top );
+/*		if ( find( cache_figs.begin(), cache_figs.end(), sym_border ) == cache_figs.end() )
+		{*/
+			Mat mm( original, sym_border );
+//			imwrite("C:\\imgs\\0.png", mm );
+			pair< char, double > proc_res = proc( mm );
+			return proc_res;
+/*			if ( pp != ret.first )
+			{
+				int t = 0;
+			}
+			cache_figs.push_back( sym_border );
+		}*/
+	}
+
+
 	return ret;
 }
 
@@ -802,7 +844,7 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 	return ret;
 }
 
-vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const figure_group& cur_gr, Mat& etal )
+vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const figure_group& cur_gr, Mat& etal, const Mat& original )
 {
 	vector< found_symbol > ret;
 	set< figure > procs_figs;
@@ -814,7 +856,7 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const fi
 			&& procs_figs.find( next.fig ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
-			const pair< char, double > cc = find_sym( kk >= 1 && kk <= 3, next.fig, etal );
+			const pair< char, double > cc = find_sym( kk >= 1 && kk <= 3, next.fig, etal, original );
 			if ( cc.first != 0 )
 			{
 				next.pos_in_pis_index = kk;
@@ -827,7 +869,7 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const fi
 	return ret;
 }
 
-vector< found_number > search_number( Mat& etal, vector< figure_group >& groups )
+vector< found_number > search_number( Mat& etal, vector< figure_group >& groups, const Mat& original )
 {
 	// ищем позиции фигур и соответсвующие им символы
 	vector< found_number > ret;
@@ -851,7 +893,7 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups 
 					{
 						pis[ kk ] = pis[ kk ] + cen;
 					}
-					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal );
+					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal, original );
 					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
 					fig_nums_sums.push_back( number_sum );
 				}
@@ -987,7 +1029,7 @@ int find_next_level( map< int, found_number >& found_nums, int gray_step )
 	}
 }
 
-Mat create_binary_mat_by_level( const Mat& input, int gray_level )
+Mat create_gray_image( const Mat& input )
 {
 	Mat gray( input.size(), CV_8U );
 	if ( input.channels() == 1 )
@@ -1002,7 +1044,7 @@ Mat create_binary_mat_by_level( const Mat& input, int gray_level )
 	{
 		assert( !"не поддерживаемое количество каналов" );
 	}
-	return gray > gray_level;
+	return gray;
 }
 
 // бьем картинку на фигуры
@@ -1098,7 +1140,7 @@ pair_int search_nearest_black( const Mat& etal, const pair_int& center )
 	}
 }
 
-void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height )
+void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, const Mat& original )
 {
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
 	if ( nearest_black.first != -1
@@ -1124,7 +1166,7 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
 			}
 			best_number.figs.push_back( conture_fig );
-			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal );
+			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal, original );
 			if ( sym_sym.first != 0 )
 			{
 				best_number.number += sym_sym.first;
@@ -1146,7 +1188,7 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 	}
 }
 
-void search_region( found_number& best_number, const Mat& etal )
+void search_region( found_number& best_number, const Mat& etal, const Mat& original )
 {
 	const vector< figure >& figs = best_number.figs;
 	if ( figs.size() != 6 ) // ищем регион только если у нас есть все 6 символов
@@ -1244,8 +1286,8 @@ void search_region( found_number& best_number, const Mat& etal )
 		sum_second = sum_second / 6;
 
 		// ищем цифры 2-х символьного региона
-		add_region( best_number, etal, sum_first, avarage_height );
-		add_region( best_number, etal, sum_second, avarage_height );
+		add_region( best_number, etal, sum_first, avarage_height, original );
+		add_region( best_number, etal, sum_second, avarage_height, original );
 //	}
 }
 
@@ -1273,7 +1315,8 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	{
 		assert( best_level != -1 );
 		found_number& best_number = found_nums[ best_level ];
-		search_region( best_number, create_binary_mat_by_level( image, best_level ) );
+		const Mat& gray_image = create_gray_image( image );
+		search_region( best_number, gray_image > best_level, gray_image );
 
 		// рисуем квадрат номера
 		Mat num_rect_image = image.clone();
@@ -1387,7 +1430,8 @@ void remove_single_pixels( Mat& mat )
 vector< found_number > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
 {
 	calcs_figs.clear();
-	Mat img_bw = create_binary_mat_by_level( input, gray_level );
+	const Mat& gray_image = create_gray_image( input );
+	Mat img_bw = gray_image > gray_level;
 	Mat img_to_rez = img_bw.clone();
 //	remove_single_pixels( img_bw );
 	// ищем фигуры
@@ -1405,6 +1449,6 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level, recog
 	// сливаем пересекающиеся группы
 	groups_merge_intersects( groups );
 	// ищем номера
-	const vector< found_number > nums = search_number( img_to_rez, groups );
+	const vector< found_number > nums = search_number( img_to_rez, groups, gray_image );
 	return nums;
 }
