@@ -10,8 +10,9 @@ TEMPLATE = lib
 
 HEADERS = \
 		engine.h \
-		syms.h \
-		plate_recog_lib_config.h
+		plate_recog_lib_config.h \
+		sym_recog.h \
+		syms.h
 SOURCES = \
 		engine.cpp \
 		syms.cpp

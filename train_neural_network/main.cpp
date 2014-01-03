@@ -11,7 +11,7 @@
 using namespace std;
 using namespace cv;
 
-const int max_hidden_neuron = 500;
+const int max_hidden_neuron = 100;
 
 vector< pair< char, Mat > > train_data( const std::string& image_folder )
 {
@@ -23,24 +23,9 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder )
 		for ( int nn = 0; nn < all_files.size(); ++nn )
 		{
 			const QString& next_file_name = all_files.at( nn );
-			Mat next_mat( imread( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() ) );
-			Mat one_chan_gray;
-			if ( next_mat.channels() == 3 && next_mat.depth() == CV_MAT_DEPTH( CV_8U ) )
-			{
-				Mat gray( next_mat.size(), CV_8U );
-				cvtColor( next_mat, one_chan_gray, CV_RGB2GRAY );
-			}
-			else if ( next_mat.channels() == 1 && next_mat.depth() == CV_MAT_DEPTH( CV_8U ) )
-			{
-				one_chan_gray = next_mat;
-			}
-
+			const Mat one_chan_gray = from_file_to_row( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() );
 			if ( !one_chan_gray.empty() )
 			{
-				Mat gray_sized( data_height, data_width, CV_8U );
-				cv::resize(one_chan_gray, gray_sized, gray_sized.size() );
-				Mat gray_float( data_height, data_width, CV_32F );
-				gray_sized.convertTo( gray_float, CV_32F );
 				switch ( next_file_name.toLocal8Bit().data()[ 0 ] )
 				{
 				case '0':
@@ -53,7 +38,7 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder )
 				case '7':
 				case '8':
 				case '9':
-					ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], gray_float ) );
+					ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], one_chan_gray ) );
 				default:
 					break;
 				}
@@ -79,23 +64,24 @@ string path_to_save_train( const string& module_path )
 	{
 		q_mod_path.clear();
 	}
-	return string( ( q_mod_path + "/neural_net.yml" ).toLocal8Bit().data() );
+	return string( ( q_mod_path + "/../../other/neural_net.yml" ).toLocal8Bit().data() );
 }
 
 void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row )
 {
-	input = Mat( t_data.size(), els_in_row, CV_32F );
+	input = Mat( 0, els_in_row, CV_32F );
 	output = Mat( t_data.size(), 10, CV_32F );
 	for ( size_t nn = 0; nn < t_data.size(); ++nn )
 	{
-		for ( int mm = 0; mm < t_data.at( nn ).second.rows; ++mm )
+		input.push_back( t_data.at( nn ).second );
+/*		for ( int mm = 0; mm < t_data.at( nn ).second.rows; ++mm )
 		{
 			for ( int kk = 0; kk < t_data.at( nn ).second.cols; ++kk )
 			{
 				const int cur_el = mm * t_data.at( nn ).second.cols + kk;
 				input.at< float >( nn, cur_el ) = t_data.at( nn ).second.at< float >( mm, kk );
 			}
-		}
+		}*/
 		for ( int mm = 0; mm < 10; ++mm )
 		{
 			output.at< float >( nn, mm ) = 0.;
@@ -105,25 +91,10 @@ void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat&
 	}
 }
 
-int search_max_val( const Mat& data, int row )
-{
-	int max_col = 0;
-	float max_val = data.at< float >( row, 0 );
-	for ( int nn = 1; nn < data.cols; ++nn )
-	{
-		if ( data.at< float >( row, nn ) > max_val )
-		{
-			max_col = nn;
-			max_val = data.at< float >( row, nn );
-		}
-	}
-	return max_col;
-}
-
 float evaluate( const Mat& output, int output_row, const Mat& pred_out )
 {
 	// проверяем правильный ли ответ
-	if ( search_max_val( output, output_row ) != search_max_val( pred_out, 0 ) )
+	if ( search_max_val( output, output_row ) != search_max_val( pred_out ) )
 		return -10.;
 
 	// находим смещение
@@ -200,17 +171,12 @@ int main( int argc, char** argv )
 		{
 			CvANN_MLP mlp( configs.at( cc ) );
 			mlp.train( input, output, weights );
-			Mat test_sample( 1, data_width * data_height, CV_32FC1 );
 			for ( size_t ll = 0; ll < t_data.size(); ++ll )
 			{
-				for ( int yy = 0; yy < data_width * data_height; ++yy )
-				{
-					test_sample.at< float >( 0, yy ) = input.at< float >( ll, yy );
-				}
 				Mat pred_out;
-				mlp.predict( test_sample, pred_out );
+				mlp.predict( input.row( ll ), pred_out );
 				const float diff = evaluate( output, ll, pred_out );
-				if ( diff >= -1.7159 ) // http://answers.opencv.org/question/25965/opencv-neural-networks/?answer=26038#post-id-26038
+				if ( diff >= -5. )
 				{
 					diff_summ += diff;
 				}
