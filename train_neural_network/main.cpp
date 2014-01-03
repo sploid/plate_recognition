@@ -13,13 +13,22 @@ using namespace cv;
 
 const int max_hidden_neuron = 100;
 
-vector< pair< char, Mat > > train_data( const std::string& image_folder )
+vector< pair< char, Mat > > train_data( const std::string& image_folder, bool num )
 {
 	vector< pair< char, Mat > > ret;
 	QDir image_dir( image_folder.c_str() );
 	if ( image_dir.exists() )
 	{
-		const QStringList all_files = image_dir.entryList( QStringList() << "*.png" );
+		QStringList filters;
+		if ( num )
+		{
+			filters << "0*.png" << "1*.png" << "2*.png" << "3*.png" << "4*.png" << "5*.png" << "6*.png" << "7*.png" << "8*.png" << "9*.png";
+		}
+		else
+		{
+			filters << "A*.png" << "B*.png" << "C*.png" << "E*.png" << "H*.png" << "K*.png" << "M*.png" << "O*.png" << "P*.png" << "T*.png" << "X*.png" << "Y*.png";
+		}
+		const QStringList all_files = image_dir.entryList( filters );
 		for ( int nn = 0; nn < all_files.size(); ++nn )
 		{
 			const QString& next_file_name = all_files.at( nn );
@@ -52,7 +61,7 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder )
 	return ret;
 }
 
-string path_to_save_train( const string& module_path )
+string path_to_save_train( const string& module_path, bool num )
 {
 	QString q_mod_path( QDir::fromNativeSeparators( QString::fromLocal8Bit( module_path.c_str() ) ) );
 	int index_separator = q_mod_path.lastIndexOf( "/" );
@@ -64,7 +73,7 @@ string path_to_save_train( const string& module_path )
 	{
 		q_mod_path.clear();
 	}
-	return string( ( q_mod_path + "/../../other/neural_net.yml" ).toLocal8Bit().data() );
+	return string( ( q_mod_path + "/../../other/neural_net_" + ( num ? "num" : "char" ) + ".yml" ).toLocal8Bit().data() );
 }
 
 void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row )
@@ -95,7 +104,7 @@ float evaluate( const Mat& output, int output_row, const Mat& pred_out )
 {
 	// проверяем правильный ли ответ
 	if ( search_max_val( output, output_row ) != search_max_val( pred_out ) )
-		return -10.;
+		return -100.;
 
 	// находим смещение
 	float ret = 0.;
@@ -122,22 +131,14 @@ void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_ind
 	}
 }
 
-int main( int argc, char** argv )
+void make_training( const string& image_folder, const string& module_path, bool num )
 {
-	if ( argc <= 1 )
-	{
-		cout << "usage: auto_test_desktop image_folder";
-		return 1;
-	}
-
-	// ищем оптимальное количество нейронов и уровней в невидимом слое
-	const string image_folder( argv[ 1 ] );
 	const int max_hidden_levels = 1;
-	const vector< pair< char, Mat > > t_data = train_data( image_folder );
+	const vector< pair< char, Mat > > t_data = train_data( image_folder, num );
 	if ( t_data.empty() )
 	{
 		cout << "input files not found";
-		return 1;
+		return;
 	}
 	Mat input, output;
 	parse_to_input_output_data( t_data, input, output, data_width * data_height );
@@ -154,7 +155,7 @@ int main( int argc, char** argv )
 		const int all_levels_count = 2 + nn;
 		Mat l_size( 1, all_levels_count, CV_32SC1 );
 		l_size.at< int >( 0 ) = data_width * data_height;
-		l_size.at< int >( all_levels_count - 1 ) = 10; // 10 цифр
+		l_size.at< int >( all_levels_count - 1 ) = num ? 10 : 12; // 10 цифр, 12 букв
 
 		fill_hidden_layers( configs, l_size, 0, nn );
 	}
@@ -176,7 +177,7 @@ int main( int argc, char** argv )
 				Mat pred_out;
 				mlp.predict( input.row( ll ), pred_out );
 				const float diff = evaluate( output, ll, pred_out );
-				if ( diff >= -5. )
+				if ( diff >= -50. )
 				{
 					diff_summ += diff;
 				}
@@ -201,6 +202,19 @@ int main( int argc, char** argv )
 	// сохраняем наилучший результат в файл
 	CvANN_MLP mlp( configs.at( best_index ) );
 	mlp.train( input, output, weights );
-	FileStorage fs( path_to_save_train( argv[ 0 ] ), cv::FileStorage::WRITE );
+	FileStorage fs( path_to_save_train( module_path, num ), cv::FileStorage::WRITE );
 	mlp.write( *fs, "mlp" );
+}
+
+int main( int argc, char** argv )
+{
+	if ( argc <= 1 )
+	{
+		cout << "usage: auto_test_desktop image_folder";
+		return 1;
+	}
+
+	// ищем оптимальное количество нейронов и уровней в невидимом слое
+	make_training( argv[ 1 ], argv[ 0 ], true );
+	make_training( argv[ 1 ], argv[ 0 ], false );
 }
