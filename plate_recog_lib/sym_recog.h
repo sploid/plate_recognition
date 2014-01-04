@@ -191,7 +191,6 @@ inline std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_
 
 	Mat pred_out;
 	mlp.predict( convert_to_row( input ), pred_out );
-	imwrite("C:\\imgs\\0.png", input);
 	const int max_val = search_max_val( pred_out );
 	return make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
 }
