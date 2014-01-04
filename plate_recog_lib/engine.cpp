@@ -284,7 +284,7 @@ double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
 	return sum;
 }
 
-pair< char, double > find_sym_legacy( bool num, const figure& fig, const Mat& etal, const Mat& original )
+pair< char, double > find_sym_legacy( bool num, const figure& fig, const Mat& etal )
 {
 	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
 	if ( it != calcs_figs.end() )
@@ -404,7 +404,15 @@ pair< char, double > find_sym_legacy( bool num, const figure& fig, const Mat& et
 	return ret;
 }
 
-pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& etal, const Mat& original )
+namespace cv
+{
+	inline bool operator < ( const cv::Rect& lh, const cv::Rect& rh )
+	{
+		return memcmp( &lh, &rh, sizeof( cv::Rect ) ) < 0;
+	}
+}
+
+pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original )
 {
 	const int left = fig.left();
 	int right = left + fig.width() + 1;
@@ -421,13 +429,26 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& etal, 
 	}
 
 	const cv::Rect sym_border( left, top, right - left, bottom - top );
-	Mat mm( original, sym_border );
-	if ( !num )
+
+	typedef pair< char, double > ret_typ;
+	static const Mat* cache_origin = 0;
+	static map< cv::Rect, ret_typ > cache_rets;
+	if ( cache_origin != &original )
 	{
-//		imwrite("C:\\imgs\\debug\\0.png", mm );
-		const pair< char, double > proc_res = proc( mm );
-		return proc_res;
+		cache_rets.clear();
+		cache_origin = &original;
 	}
+
+	map< cv::Rect, ret_typ >::const_iterator it = cache_rets.find( sym_border );
+	if ( it != cache_rets.end() )
+	{
+		return it->second;
+	}
+
+	Mat mm( original, sym_border );
+	ret_typ ret = num ? proc_num( mm ) : proc_char( mm );
+	cache_rets[ sym_border ] = ret;
+	return ret;
 }
 
 
@@ -831,7 +852,8 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const fi
 			&& procs_figs.find( next.fig ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
-			const pair< char, double > cc = find_sym_legacy( kk >= 1 && kk <= 3, next.fig, etal, original );
+//			const pair< char, double > cc = find_sym_legacy( kk >= 1 && kk <= 3, next.fig, etal );
+			const pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original );
 			if ( cc.first != 0 )
 			{
 				next.pos_in_pis_index = kk;
@@ -1141,7 +1163,8 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
 			}
 			best_number.figs.push_back( conture_fig );
-			const pair< char, double > sym_sym = find_sym_legacy( true, conture_fig, etal, original );
+//			const pair< char, double > sym_sym = find_sym_legacy( true, conture_fig, etal );
+			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, original );
 			if ( sym_sym.first != 0 )
 			{
 				best_number.number += sym_sym.first;
