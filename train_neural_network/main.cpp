@@ -196,6 +196,7 @@ void make_training( const string& image_folder, const string& module_path, bool 
 		float diff_summ = 0.;
 		try
 		{
+			theRNG().state = 0x111111;
 			CvANN_MLP mlp( configs.at( cc ) );
 			mlp.train( input, output, weights );
 			for ( size_t ll = 0; ll < t_data.size(); ++ll )
@@ -226,6 +227,7 @@ void make_training( const string& image_folder, const string& module_path, bool 
 	}
 	cout << configs.at( best_index );
 	// сохраняем наилучший результат в файл
+	theRNG().state = 0x111111;
 	CvANN_MLP mlp( configs.at( best_index ) );
 	mlp.train( input, output, weights );
 	FileStorage fs( path_to_save_train( module_path, num ), cv::FileStorage::WRITE );
@@ -242,7 +244,6 @@ int main( int argc, char** argv )
 		return 1;
 	}
 
-	// !!! НЕЛЬЗЯ СРАЗУ ЗАПУСКАТЬ 2 ОБУЧЕНИЯ
 	make_training( argv[ 1 ], argv[ 0 ], false );
 	make_training( argv[ 1 ], argv[ 0 ], true );
 }
