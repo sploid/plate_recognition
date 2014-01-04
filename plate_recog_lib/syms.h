@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 
 std::vector< std::vector< float > > std_sym0();

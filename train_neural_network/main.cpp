@@ -35,22 +35,7 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder, bool nu
 			const Mat one_chan_gray = from_file_to_row( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() );
 			if ( !one_chan_gray.empty() )
 			{
-				switch ( next_file_name.toLocal8Bit().data()[ 0 ] )
-				{
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-				case '8':
-				case '9':
-					ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], one_chan_gray ) );
-				default:
-					break;
-				}
+				ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], one_chan_gray ) );
 			}
 			else
 			{
@@ -76,27 +61,68 @@ string path_to_save_train( const string& module_path, bool num )
 	return string( ( q_mod_path + "/../../other/neural_net_" + ( num ? "num" : "char" ) + ".yml" ).toLocal8Bit().data() );
 }
 
-void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row )
+void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row, bool num )
 {
+	const int count_ret = num ? 10 : 12;
 	input = Mat( 0, els_in_row, CV_32F );
-	output = Mat( t_data.size(), 10, CV_32F );
+	output = Mat( t_data.size(), count_ret, CV_32F );
 	for ( size_t nn = 0; nn < t_data.size(); ++nn )
 	{
 		input.push_back( t_data.at( nn ).second );
-/*		for ( int mm = 0; mm < t_data.at( nn ).second.rows; ++mm )
-		{
-			for ( int kk = 0; kk < t_data.at( nn ).second.cols; ++kk )
-			{
-				const int cur_el = mm * t_data.at( nn ).second.cols + kk;
-				input.at< float >( nn, cur_el ) = t_data.at( nn ).second.at< float >( mm, kk );
-			}
-		}*/
-		for ( int mm = 0; mm < 10; ++mm )
+		for ( int mm = 0; mm < count_ret; ++mm )
 		{
 			output.at< float >( nn, mm ) = 0.;
 		}
-		assert( t_data.at( nn ).first >= 48 && t_data.at( nn ).first <= 57 );
-		output.at< float >( nn, t_data.at( nn ).first - 48 ) = 1.;
+		int el_index = 0;
+		if ( num )
+		{
+			el_index = t_data.at( nn ).first - 48;
+		}
+		else
+		{
+			switch (t_data.at( nn ).first)
+			{
+			default:
+				assert( !"there should be no such char" );
+			case 'A':
+				el_index = 0;
+				break;
+			case 'B':
+				el_index = 1;
+				break;
+			case 'C':
+				el_index = 2;
+				break;
+			case 'E':
+				el_index = 3;
+				break;
+			case 'H':
+				el_index = 4;
+				break;
+			case 'K':
+				el_index = 5;
+				break;
+			case 'M':
+				el_index = 6;
+				break;
+			case 'O':
+				el_index = 7;
+				break;
+			case 'P':
+				el_index = 8;
+				break;
+			case 'T':
+				el_index = 9;
+				break;
+			case 'X':
+				el_index = 10;
+				break;
+			case 'Y':
+				el_index = 11;
+				break;
+			}
+		}
+		output.at< float >( nn, el_index ) = 1.;
 	}
 }
 
@@ -141,14 +167,14 @@ void make_training( const string& image_folder, const string& module_path, bool 
 		return;
 	}
 	Mat input, output;
-	parse_to_input_output_data( t_data, input, output, data_width * data_height );
+	parse_to_input_output_data( t_data, input, output, data_width * data_height, num );
 	Mat weights( 1, t_data.size(), CV_32FC1, Scalar::all( 1 ) );
 
 	// формируем конфигурации сети
 	vector< Mat > configs;
 	Mat first_size( 1, 2, CV_32SC1 );
 	first_size.at< int >( 0 ) = data_width * data_height;
-	first_size.at< int >( 1 ) = 10; // 10 цифр
+	first_size.at< int >( 1 ) = num ? 10 : 12; // 10 цифр, 12 букв
 	configs.push_back( first_size );
 	for ( int nn = 1; nn <= max_hidden_levels; ++nn )
 	{
@@ -206,6 +232,8 @@ void make_training( const string& image_folder, const string& module_path, bool 
 	mlp.write( *fs, "mlp" );
 }
 
+#include "syms.h"
+
 int main( int argc, char** argv )
 {
 	if ( argc <= 1 )
@@ -214,7 +242,6 @@ int main( int argc, char** argv )
 		return 1;
 	}
 
-	// ищем оптимальное количество нейронов и уровней в невидимом слое
 	make_training( argv[ 1 ], argv[ 0 ], true );
 	make_training( argv[ 1 ], argv[ 0 ], false );
 }
