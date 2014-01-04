@@ -81,21 +81,102 @@ inline cv::Mat from_file_to_row( const std::string& file_name )
 	return Mat();
 }
 
-inline std::pair< char, double > proc( const cv::Mat& input )
+char index_to_char_num( int index )
+{
+	switch ( index )
+	{
+	default:
+		assert( !"govno" );
+	case 0:
+		return '0';
+	case 1:
+		return '1';
+	case 2:
+		return '2';
+	case 3:
+		return '3';
+	case 4:
+		return '4';
+	case 5:
+		return '5';
+	case 6:
+		return '6';
+	case 7:
+		return '7';
+	case 8:
+		return '8';
+	case 9:
+		return '9';
+	}
+}
+
+char index_to_char_char( int index )
+{
+	switch ( index )
+	{
+	default:
+		assert( !"govno" );
+	case 0:
+		return 'A';
+	case 1:
+		return 'B';
+	case 2:
+		return 'C';
+	case 3:
+		return 'E';
+	case 4:
+		return 'H';
+	case 5:
+		return 'K';
+	case 6:
+		return 'M';
+	case 7:
+		return 'O';
+	case 8:
+		return 'P';
+	case 9:
+		return 'T';
+	case 10:
+		return 'X';
+	case 11:
+		return 'Y';
+	}
+}
+
+typedef char (*index_to_char_func)( int );
+
+double predict_min_diff( const cv::Mat& pred_out, int max_val )
+{
+	float ret = 100.; // the current version of the OpenCV Neural Network, the value will not exceed 1.76
+	for ( int nn = 0; nn < pred_out.cols; ++nn )
+	{
+		if ( nn != max_val )
+		{
+			const float curr_diff = abs( pred_out.at< float >( 0, max_val ) - pred_out.at< float >( 0, nn ) );
+			if ( curr_diff < ret )
+			{
+				ret = curr_diff;
+			}
+		}
+	}
+	return ret * 1000.;
+}
+
+
+inline std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& mlp, const std::string& train_file_name, index_to_char_func i2c )
 {
 	using namespace cv;
 	using namespace std;
 
-	static CvANN_MLP mlp;
 	if ( mlp.get_layer_count() == 0 )
 	{
 		try
 		{
-			FileStorage fs("C:\\soft\\plate_recognition\\other\\neural_net.yml", cv::FileStorage::READ);
-			FileNode fn = fs["mlp"];
+			FileStorage fs( train_file_name, cv::FileStorage::READ );
+			FileNode fn = fs[ "mlp" ];
 			if ( !fn.empty() )
 			{
-				mlp.read(*fs, *fn);
+				mlp.read( *fs, *fn );
 			}
 			else
 			{
@@ -110,56 +191,19 @@ inline std::pair< char, double > proc( const cv::Mat& input )
 
 	Mat pred_out;
 	mlp.predict( convert_to_row( input ), pred_out );
+	imwrite("C:\\imgs\\0.png", input);
 	const int max_val = search_max_val( pred_out );
-	char ret_char;
-	switch ( max_val )
-	{
-	default:
-		assert( !"govno" );
-	case 0:
-		ret_char = '0';
-		break;
-	case 1:
-		ret_char = '1';
-		break;
-	case 2:
-		ret_char = '2';
-		break;
-	case 3:
-		ret_char = '3';
-		break;
-	case 4:
-		ret_char = '4';
-		break;
-	case 5:
-		ret_char = '5';
-		break;
-	case 6:
-		ret_char = '6';
-		break;
-	case 7:
-		ret_char = '7';
-		break;
-	case 8:
-		ret_char = '8';
-		break;
-	case 9:
-		ret_char = '9';
-		break;
-	}
-	float min_diff = 100.;
-	for ( int nn = 0; nn < pred_out.cols; ++nn )
-	{
-		if ( nn != max_val )
-		{
-			const float curr_diff = abs( pred_out.at< float >( 0, max_val ) - pred_out.at< float >( 0, nn ) );
-			if ( curr_diff < min_diff )
-			{
-				min_diff = curr_diff;
-			}
-		}
-	}
-	return make_pair( ret_char, min_diff * 1000 );
-//	output = Mat( t_data.size(), 10, CV_32F );
+	return make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
+}
 
+inline std::pair< char, double > proc_char( const cv::Mat& input )
+{
+	static cv::NeuralNet_MLP mlp;
+	return proc_impl( input, mlp, "C:\\dork\\plate_recognition\\other\\neural_net_char.yml", &index_to_char_char );
+}
+
+inline std::pair< char, double > proc_num( const cv::Mat& input )
+{
+	static cv::NeuralNet_MLP mlp;
+	return proc_impl( input, mlp, "C:\\dork\\plate_recognition\\other\\neural_net_num.yml", &index_to_char_num );
 }

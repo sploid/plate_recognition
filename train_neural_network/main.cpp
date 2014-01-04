@@ -242,6 +242,7 @@ int main( int argc, char** argv )
 		return 1;
 	}
 
-	make_training( argv[ 1 ], argv[ 0 ], true );
+	// !!! НЕЛЬЗЯ СРАЗУ ЗАПУСКАТЬ 2 ОБУЧЕНИЯ
 	make_training( argv[ 1 ], argv[ 0 ], false );
+	make_training( argv[ 1 ], argv[ 0 ], true );
 }
