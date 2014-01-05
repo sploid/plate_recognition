@@ -2,6 +2,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "utils.h"
+
 const int data_width = 15;
 const int data_height = 22;
 
@@ -192,17 +194,22 @@ inline std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_
 	Mat pred_out;
 	mlp.predict( convert_to_row( input ), pred_out );
 	const int max_val = search_max_val( pred_out );
-	return make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
+	const pair< char, double > ret = make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
+	if ( ret.first == 'A' )
+	{
+//		imwrite( next_name( "sym" ), input );
+	}
+	return ret;
 }
 
 inline std::pair< char, double > proc_char( const cv::Mat& input )
 {
 	static cv::NeuralNet_MLP mlp;
-	return proc_impl( input, mlp, "C:\\dork\\plate_recognition\\other\\neural_net_char.yml", &index_to_char_char );
+	return proc_impl( input, mlp, "C:\\soft\\plate_recognition\\other\\neural_net_char.yml", &index_to_char_char );
 }
 
 inline std::pair< char, double > proc_num( const cv::Mat& input )
 {
 	static cv::NeuralNet_MLP mlp;
-	return proc_impl( input, mlp, "C:\\dork\\plate_recognition\\other\\neural_net_num.yml", &index_to_char_num );
+	return proc_impl( input, mlp, "C:\\soft\\plate_recognition\\other\\neural_net_num.yml", &index_to_char_num );
 }

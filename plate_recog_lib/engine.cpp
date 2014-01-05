@@ -3,13 +3,10 @@
 #include <assert.h>
 #include "syms.h"
 #include "sym_recog.h"
-
+#include "utils.h"
 
 using namespace cv;
 using namespace std;
-
-typedef pair< int, int > pair_int;
-typedef pair< double, double > pair_doub;
 
 class figure
 {
@@ -180,9 +177,9 @@ inline pair_doub operator * ( const pair_doub& lh, const double& koef )
 // Рассчитываем центры символов
 vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height )
 {
-	const double angl_grad = static_cast< double >( std::abs( angle ) ) * 3.14 / 180.;
+	const double angl_grad = static_cast< double >( std::abs( angle < 0 ? angle + 10 : angle ) ) * 3.14 / 180.;
 	const double koef = static_cast< double >( first_fig_height ) * cos( angl_grad );
-	const double move_by_y = koef * 0.15;
+	const double move_by_y = koef * 0.2;
 	double move_by_x = 0.;
 	vector< pair_int > etalons;
 	if ( angle >= 0 )
@@ -193,11 +190,11 @@ vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height
 	{
 		move_by_x = koef * 1.06;
 	}
-	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), static_cast< int >( move_by_y ) ) );
-	etalons.push_back( make_pair( static_cast< int >( 2. * move_by_x ), 0 ) );
-	etalons.push_back( make_pair( static_cast< int >( 3. * move_by_x ), 0 ) );
-	etalons.push_back( make_pair( static_cast< int >( 4. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
-	etalons.push_back( make_pair( static_cast< int >( 5. * move_by_x ), 0 ) );
+	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), 0 ) );
+	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), 0 ) );
 
 	vector< pair_int > ret;
 	const pair_int ret_front( make_pair( 0, 0 ) );
@@ -432,14 +429,14 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 
 	typedef pair< char, double > ret_typ;
 	static const Mat* cache_origin = 0;
-	static map< cv::Rect, ret_typ > cache_rets;
+	static map< pair< cv::Rect, bool >, ret_typ > cache_rets;
 	if ( cache_origin != &original )
 	{
 		cache_rets.clear();
 		cache_origin = &original;
 	}
 
-	map< cv::Rect, ret_typ >::const_iterator it = cache_rets.find( sym_border );
+	map< pair< cv::Rect, bool >, ret_typ >::const_iterator it = cache_rets.find( make_pair( sym_border, num ) );
 	if ( it != cache_rets.end() )
 	{
 		return it->second;
@@ -447,7 +444,7 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 
 	Mat mm( original, sym_border );
 	ret_typ ret = num ? proc_num( mm ) : proc_char( mm );
-	cache_rets[ sym_border ] = ret;
+	cache_rets[ make_pair( sym_border, num ) ] = ret;
 	return ret;
 }
 
@@ -526,6 +523,18 @@ bool less_by_left_pos( const figure& lf, const figure& rf )
 }
 
 typedef vector< figure > figure_group;
+
+void draw_figures( const figure_group& figs, const Mat& etal, const string& key = "figs" )
+{
+	Mat colored_rect( etal.size(), CV_8UC3 );
+	cvtColor( etal, colored_rect, CV_GRAY2RGB );
+	for ( size_t mm = 0; mm < figs.size(); ++mm )
+	{
+		const figure* cur_fig = &figs.at( mm );
+		rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
+	}
+	imwrite( next_name( key ), colored_rect );
+}
 
 figure find_figure( const figure_group& gr, const pair_int& pos )
 {
@@ -795,7 +804,7 @@ struct found_symbol
 	double weight;
 };
 
-found_number find_best_number_by_weight( const vector< found_number >& vals )
+found_number find_best_number_by_weight( const vector< found_number >& vals, const Mat* etal = 0 )
 {
 	assert( !vals.empty() );
 	if ( vals.empty() )
@@ -807,6 +816,20 @@ found_number find_best_number_by_weight( const vector< found_number >& vals )
 		{
 			best_index = nn;
 		}
+/*		static int tt = 0;
+		cout << tt << " " << vals[ best_index ].number << " " << vals[ best_index ].weight << endl;
+		if ( etal )
+		{
+			Mat colored_rect( etal->size(), CV_8UC3 );
+			cvtColor( *etal, colored_rect, CV_GRAY2RGB );
+			for ( size_t nn = 0; nn < vals[ best_index ].figs.size(); ++nn )
+			{
+				const figure* cur_fig = &vals[ best_index ].figs.at( nn );
+				rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
+			}
+			imwrite( next_name( "fig" ), colored_rect );
+		}
+		tt++;*/
 	}
 	return vals[ best_index ];
 }
@@ -836,31 +859,39 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 			ret.number += "?";
 		}
 	}
-	ret.weight = static_cast< int >( weight ) / 1000;
+	ret.weight = static_cast< int >( weight );
 	return ret;
 }
 
-vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const figure_group& cur_gr, Mat& etal, const Mat& original )
+vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pair_int& pos_center, const figure_group& cur_gr, Mat& etal, const Mat& original )
 {
+//	draw_figures( cur_gr, etal );
 	vector< found_symbol > ret;
 	set< figure > procs_figs;
+	assert( pis.size() == 6 );
+	pair_int prev_pos = pos_center;
 	for ( size_t kk = 0; kk < pis.size(); ++kk )
 	{
+		const pair_int next_pos = prev_pos + pis.at( kk );
+//		draw_point( next_pos, etal );
 		found_symbol next;
-		next.fig = find_figure( cur_gr, pis.at( kk ) );
+		next.fig = find_figure( cur_gr, next_pos );
 		if ( !next.fig.is_empty()
-			&& procs_figs.find( next.fig ) == procs_figs.end() )
+			&& procs_figs.find( next.fig  ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
 //			const pair< char, double > cc = find_sym_legacy( kk >= 1 && kk <= 3, next.fig, etal );
 			const pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original );
-			if ( cc.first != 0 )
-			{
-				next.pos_in_pis_index = kk;
-				next.symbol = cc.first;
-				next.weight = cc.second;
-				ret.push_back( next );
-			}
+			assert( cc.first != 0 );
+			next.pos_in_pis_index = kk;
+			next.symbol = cc.first;
+			next.weight = cc.second;
+			ret.push_back( next );
+			prev_pos = next.fig.center();
+		}
+		else
+		{
+			prev_pos = next_pos;
 		}
 	}
 	return ret;
@@ -883,14 +914,12 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 			for ( int ll = 0; ll < 1; ++ll )
 			{
 				// меняем угол наклона номера относительно нас (0 - смотрим прям на номер, если угол меньше 0, то определяем номер с 2-х значным регионом)
-				for ( int oo = -50; oo < 50; oo += 10 )
+//				int oo = -10;
+				for ( int oo = -60; oo < 50; oo += 10 )
 				{
-					vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
-					for ( size_t kk = 0; kk < pis.size(); ++kk ) // сдвигаем все относительно центра первой фигуры
-					{
-						pis[ kk ] = pis[ kk ] + cen;
-					}
-					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cur_gr, etal, original );
+					const vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
+					assert( pis.size() == 6 ); // всегда 6 символов без региона в номере
+					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, etal, original );
 					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
 					fig_nums_sums.push_back( number_sum );
 				}
@@ -900,20 +929,21 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 		// выбираем лучшее
 		if ( !fig_nums_sums.empty() )
 		{
-			ret.push_back( find_best_number_by_weight( fig_nums_sums ) );
+			ret.push_back( find_best_number_by_weight( fig_nums_sums, &etal ) );
 		}
 	}
 
 	// отрисовываем выбранные группы
-/*	for ( int nn = 0; nn < groups.size(); ++nn )
+/*	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		Mat colored_rect( etal.size(), CV_8UC3 );
 		cvtColor( etal, colored_rect, CV_GRAY2RGB );
 		for ( int mm = 0; mm < groups.at( nn ).size(); ++mm )
 		{
-			const std_figure* cur_fig = groups.at( nn ).at( mm );
+			const figure* cur_fig = &groups.at( nn ).at( mm );
 			rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
+		imwrite( next_name( "d" ), colored_rect );
 		recog_debug->out_image( colored_rect );
 	}*/
 	return ret;
@@ -1171,18 +1201,18 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 			}
 			else
 			{
-				best_number.number += '?';
+				best_number.number += "?";
 			}
 		}
 		else
 		{
 			// не нашли верхней границы
-			best_number.number += '?';
+			best_number.number += "?";
 		}
 	}
 	else
 	{
-		best_number.number += '?';
+		best_number.number += "?";
 	}
 }
 
@@ -1284,8 +1314,8 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 		sum_second = sum_second / 6;
 
 		// ищем цифры 2-х символьного региона
-		add_region( best_number, etal, sum_first, avarage_height, original );
-		add_region( best_number, etal, sum_second, avarage_height, original );
+//		add_region( best_number, etal, sum_first, avarage_height, original );
+//		add_region( best_number, etal, sum_second, avarage_height, original );
 //	}
 }
 
@@ -1325,7 +1355,8 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 		}
 		recog_debug->out_image( num_rect_image );
 
-		imwrite("C:\\imgs\\debug\\0.png", num_rect_image);
+//		imwrite( "C:\\imgs\\debug\\0.png", num_rect_image );
+//		imwrite( "C:\\imgs\\debug\\1.png", gray_image > best_level );
 
 		return best_number.to_pair();
 	}
@@ -1364,6 +1395,8 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 			first_search_levels.push_back( nn );
 		}
 	}
+//	first_search_levels.clear();
+//	first_search_levels.push_back( 130 );
 //	Проверить почему у мерина последняя цифра региона определилась не верно 
 
 	map< int, found_number > found_nums;
