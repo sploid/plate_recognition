@@ -11,7 +11,7 @@
 using namespace std;
 using namespace cv;
 
-const int max_hidden_neuron = 100;
+const int max_hidden_neuron = 25;
 
 vector< pair< char, Mat > > train_data( const std::string& image_folder, bool num )
 {
