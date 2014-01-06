@@ -145,6 +145,27 @@ struct found_number
 	{
 		return make_pair( number, weight );
 	}
+	bool operator < ( const found_number& other ) const
+	{
+		const int cnp = count_not_parsed_syms();
+		const int cnp_other = other.count_not_parsed_syms();
+		if ( cnp != cnp_other )
+		{
+			return cnp > cnp_other;
+		}
+		else
+		{
+			return weight < other.weight;
+		}
+	}
+
+private:
+	int count_not_parsed_syms() const
+	{
+		if ( number.empty() )
+			return 100; // вообще ничего нет
+		return count( number.begin(), number.end(), '?' );
+	}
 };
 
 vector< found_number > read_number_impl( const Mat& image, int grey_level, recog_debug_callback *recog_debug );
@@ -812,7 +833,7 @@ found_number find_best_number_by_weight( const vector< found_number >& vals, con
 	int best_index = 0;
 	for ( size_t nn = 1; nn < vals.size(); ++nn )
 	{
-		if ( vals[ best_index ].weight < vals[ nn ].weight )
+		if ( vals[ best_index ] < vals[ nn ] )
 		{
 			best_index = nn;
 		}
@@ -949,24 +970,22 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 	return ret;
 }
 
-int fine_best_level( map< int, found_number >& found_nums )
+int fine_best_level( const map< int, found_number >& found_nums )
 {
-	int ret = -1;
-	int best_val = -1;
-	for ( map< int, found_number >::const_iterator it = found_nums.begin(); it != found_nums.end(); ++it )
+	if ( found_nums.empty() )
+		return -1;
+	map< int, found_number >::const_iterator it_ret = found_nums.begin();
+	map< int, found_number >::const_iterator it_cur = found_nums.begin();
+	++it_cur;
+	for ( ; it_cur != found_nums.end(); ++it_cur )
 	{
-		const int cur_val = it->second.weight;
-		if ( cur_val != -1 )
+		assert( it_cur->second.weight != -1 );
+		if ( it_ret->second < it_cur->second )
 		{
-			if ( best_val == -1
-				|| found_nums[ ret ].weight < cur_val )
-			{
-				ret = it->first;
-				best_val = cur_val;
-			}
+			it_ret = it_cur;
 		}
 	}
-	return ret;
+	return it_ret->first;
 }
 
 int find_next_level( map< int, found_number >& found_nums, int gray_step )
