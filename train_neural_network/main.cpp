@@ -236,6 +236,7 @@ void make_training( const string& image_folder, const string& module_path, bool 
 
 int main( int argc, char** argv )
 {
+	QCoreApplication a( argc, argv );
 	if ( argc <= 1 )
 	{
 		cout << "usage: auto_test_desktop image_folder";
