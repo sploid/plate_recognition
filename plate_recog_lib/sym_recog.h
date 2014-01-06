@@ -45,6 +45,9 @@ inline cv::Mat convert_to_row( const cv::Mat& input )
 
 	if ( !one_chan_gray.empty() )
 	{
+		// сглаживаем
+		boxFilter( one_chan_gray, one_chan_gray, -1, Size( 3, 3 ) );
+		// раст€гиваем по цвету
 		equalizeHist( one_chan_gray, one_chan_gray );
 		Mat gray_float( one_chan_gray.size(), CV_32F );
 		one_chan_gray.convertTo( gray_float, CV_32F );
@@ -197,7 +200,7 @@ inline std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_
 	const pair< char, double > ret = make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
 	if ( ret.first == 'A' )
 	{
-//		imwrite( next_name( "sym" ), input );
+//		imwrite( next_name( string( "sym" ) + ret.first ), input );
 	}
 	return ret;
 }

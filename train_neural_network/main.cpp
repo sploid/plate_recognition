@@ -225,7 +225,7 @@ void make_training( const string& image_folder, const string& module_path, bool 
 			best_diff = diff_summ;
 		}
 	}
-	cout << configs.at( best_index );
+	cout << configs.at( best_index ) << endl;
 	// сохраняем наилучший результат в файл
 	theRNG().state = 0x111111;
 	CvANN_MLP mlp( configs.at( best_index ) );
@@ -233,8 +233,6 @@ void make_training( const string& image_folder, const string& module_path, bool 
 	FileStorage fs( path_to_save_train( module_path, num ), cv::FileStorage::WRITE );
 	mlp.write( *fs, "mlp" );
 }
-
-#include "syms.h"
 
 int main( int argc, char** argv )
 {
