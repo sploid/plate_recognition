@@ -13,8 +13,10 @@ using namespace cv;
 
 const int max_hidden_neuron = 25;
 
-vector< pair< char, Mat > > train_data( const std::string& image_folder, bool num )
+vector< pair< char, Mat > > train_data( bool num )
 {
+	const string image_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../train_data" ).toLocal8Bit() );
+
 	vector< pair< char, Mat > > ret;
 	QDir image_dir( image_folder.c_str() );
 	if ( image_dir.exists() )
@@ -46,19 +48,10 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder, bool nu
 	return ret;
 }
 
-string path_to_save_train( const string& module_path, bool num )
+string path_to_save_train( bool num )
 {
-	QString q_mod_path( QDir::fromNativeSeparators( QString::fromLocal8Bit( module_path.c_str() ) ) );
-	int index_separator = q_mod_path.lastIndexOf( "/" );
-	if ( index_separator != -1 )
-	{
-		q_mod_path.remove( index_separator, q_mod_path.size() - index_separator );
-	}
-	else
-	{
-		q_mod_path.clear();
-	}
-	return string( ( q_mod_path + "/../../other/neural_net_" + ( num ? "num" : "char" ) + ".yml" ).toLocal8Bit().data() );
+	const string nn_config_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../other" ).toLocal8Bit() );
+	return num ? nn_config_folder + "\\neural_net_num.yml" : nn_config_folder + "\\neural_net_char.yml";
 }
 
 void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row, bool num )
@@ -157,10 +150,10 @@ void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_ind
 	}
 }
 
-void make_training( const string& image_folder, const string& module_path, bool num )
+void make_training( bool num )
 {
 	const int max_hidden_levels = 1;
-	const vector< pair< char, Mat > > t_data = train_data( image_folder, num );
+	const vector< pair< char, Mat > > t_data = train_data( num );
 	if ( t_data.empty() )
 	{
 		cout << "input files not found";
@@ -230,19 +223,13 @@ void make_training( const string& image_folder, const string& module_path, bool 
 	theRNG().state = 0x111111;
 	CvANN_MLP mlp( configs.at( best_index ) );
 	mlp.train( input, output, weights );
-	FileStorage fs( path_to_save_train( module_path, num ), cv::FileStorage::WRITE );
+	FileStorage fs( path_to_save_train( num ), cv::FileStorage::WRITE );
 	mlp.write( *fs, "mlp" );
 }
 
 int main( int argc, char** argv )
 {
 	QCoreApplication a( argc, argv );
-	if ( argc <= 1 )
-	{
-		cout << "usage: auto_test_desktop image_folder";
-		return 1;
-	}
-
-	make_training( argv[ 1 ], argv[ 0 ], false );
-	make_training( argv[ 1 ], argv[ 0 ], true );
+	make_training( false );
+	make_training( true );
 }
