@@ -5,7 +5,6 @@
 #include "sym_recog.h"
 #include "utils.h"
 #include "figure.h"
-#include "number_data.h"
 
 using namespace cv;
 using namespace std;
@@ -21,6 +20,7 @@ struct found_number
 	string number;		// номер
 	int weight;			// вес
 	vector< figure > figs;
+
 	pair< string, int > to_pair() const
 	{
 		return make_pair( number, weight );
@@ -47,6 +47,86 @@ private:
 		return count( number.begin(), number.end(), '?' );
 	}
 };
+
+struct number_data
+{
+	number_data()
+		: m_cache_origin( 0 )
+	{
+	}
+	~number_data()
+	{
+	}
+	const cv::Mat* m_cache_origin;
+	std::map< std::pair< cv::Rect, bool >, std::pair< char, double > > m_cache_rets;
+
+private:
+	number_data( const number_data& other );
+	number_data& operator=( const number_data& other );
+};
+
+#define COUNT_GLOBAL_DATA 8
+static int g_points_dublicate_first[ COUNT_GLOBAL_DATA ][ 1024 * 1024 * 10 ];
+static int g_points_dublicate_second[ COUNT_GLOBAL_DATA ][ 1024 * 1024 * 10 ];
+static int g_points_count[ COUNT_GLOBAL_DATA ] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static pair_int g_pix_around[ COUNT_GLOBAL_DATA ][ 4 ] = {
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
+	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) } };
+static bool g_busy_indexes[ COUNT_GLOBAL_DATA ] = { false, false, false, false, false, false, false, false };
+
+#ifdef _WIN32
+
+#include <windows.h>
+HANDLE h_data_guard = CreateMutex( NULL, FALSE, NULL );
+int get_free_index()
+{
+	if ( WaitForSingleObject( h_data_guard, INFINITE ) != WAIT_OBJECT_0 )
+	{
+		throw runtime_error( "failed call winapi func" );
+	}
+	for ( int nn = 0; nn < COUNT_GLOBAL_DATA; ++nn )
+	{
+		if ( !g_busy_indexes[ nn ] )
+		{
+			g_busy_indexes[ nn ] = true;
+			ReleaseMutex( h_data_guard );
+			return nn;
+		}
+	}
+	ReleaseMutex( h_data_guard );
+	throw runtime_error( "no free data" );
+}
+
+void set_free_index( int index )
+{
+	assert( index >= 0 && index < COUNT_GLOBAL_DATA );
+	if ( WaitForSingleObject( h_data_guard, INFINITE ) != WAIT_OBJECT_0 )
+	{
+		throw runtime_error( "failed call winapi func" );
+	}
+	g_busy_indexes[ index ] = false;
+	ReleaseMutex( h_data_guard );
+}
+
+#else
+
+// не поддерживаем многопоточность
+int get_free_index()
+{
+	return 0;
+}
+void set_free_index( int index )
+{
+	(void)index;
+}
+
+#endif // _WIN32
 
 vector< found_number > read_number_impl( const Mat& image, int grey_level, recog_debug_callback *recog_debug );
 
@@ -173,12 +253,11 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 	return ret;
 }
 
-
 // выбираем пиксели что бы получить контур, ограниченный белыми пикселями
+template< int stat_data_index >
 void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border = -1, int bottom_border = -1 )
 {
-//	imwrite("C:\\imgs\\debug\\0.png", mat );
-	int64 bb = cv::getTickCount();
+//	time_mesure tm( "NEXT:" );
 	if ( top_border == -1 ) // верняя граница поиска
 	{
 		top_border = 0;
@@ -187,43 +266,28 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 	{
 		bottom_border = mat.rows;
 	}
-	static vector< pair_int > points_dublicate;
-	static vector< pair_int > pix_around( 4 );
-/*	static bool init = false;
-	if ( !init )
-	{*/
-/*		pix_around[ 0 ] = make_pair( cur_nn, cur_mm + 1 );
-		pix_around[ 1 ] = make_pair( cur_nn - 1, cur_mm );
-		pix_around[ 2 ] = make_pair( cur_nn + 1, cur_mm );
-		pix_around[ 3 ] = make_pair( cur_nn, cur_mm - 1 );*/
-		pix_around[ 0 ] = make_pair( 0, 1 );
-		pix_around[ 1 ] = make_pair( - 1, 0 );
-		pix_around[ 2 ] = make_pair( 1, 0 );
-		pix_around[ 3 ] = make_pair( 0, - 1 );
-//		points_dublicate.reserve( 10000 );
-/*		init = true;
-	}*/
 
-	fig.add_point( pair_int( row, col ) );
-	points_dublicate.clear();
-	points_dublicate.push_back( make_pair( row, col ) );
+	g_points_count[ stat_data_index ] = 0;
+	g_points_dublicate_first[ stat_data_index ][ g_points_count[ stat_data_index ] ] = row;
+	g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = col;
+
 	// что бы не зациклилось
 	mat.at< unsigned char >( row, col ) = 255;
-	size_t cur_index = 0;
-	while ( cur_index < points_dublicate.size() )
+	int cur_index = 0;
+	while ( cur_index < g_points_count[ stat_data_index ] )
 	{
-//		pix_around.reserve( 8 );
-		const int cur_nn = points_dublicate[ cur_index ].first;
-		const int cur_mm = points_dublicate[ cur_index ].second;
-		for ( size_t yy = 0; yy < pix_around.size(); ++yy )
+		const int& cur_nn = g_points_dublicate_first[ stat_data_index ][ cur_index ];
+		const int& cur_mm = g_points_dublicate_second[ stat_data_index ][ cur_index ];
+		for ( size_t yy = 0; yy < sizeof( g_pix_around[ 0 ] ) / sizeof( g_pix_around[ 0 ][ 0 ] ); ++yy )
 		{
-			int curr_pix_a[ 2 ] = { pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm };
+			int curr_pix_a[ 2 ] = { g_pix_around[ stat_data_index ][ yy ].first + cur_nn, g_pix_around[ stat_data_index ][ yy ].second + cur_mm };
 			if ( curr_pix_a[ 0 ] >= top_border && curr_pix_a[ 0 ] < bottom_border
 				&& curr_pix_a[ 1 ] >= 0 && curr_pix_a[ 1 ] < mat.cols )
 			{
 				if ( mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) == 0 )
 				{
-					points_dublicate.push_back( pair_int( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
+					g_points_dublicate_first[ stat_data_index ][ g_points_count[ stat_data_index ] ] = curr_pix_a[ 0 ];
+					g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = curr_pix_a[ 1 ];
 					fig.add_point( pair_int( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
 					// что бы не зациклилось
 					mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) = 255;
@@ -232,9 +296,6 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 		}
 		++cur_index;
 	}
-	int be = cv::getTickCount();
-//	cout << (((double)cv::getTickCount() - bb)/cv::getTickFrequency()) * 1000.;
-	int t = 0;
 }
 
 bool fig_less_left( const figure& lf, const figure& rf )
@@ -575,7 +636,7 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 	return ret;
 }
 
-vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pair_int& pos_center, const figure_group& cur_gr, Mat& etal, const Mat& original, number_data& stat_data )
+vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pair_int& pos_center, const figure_group& cur_gr, const Mat& original, number_data& stat_data )
 {
 //	draw_figures( cur_gr, etal );
 	vector< found_symbol > ret;
@@ -629,7 +690,7 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 				{
 					const vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
 					assert( pis.size() == 6 ); // всегда 6 символов без региона в номере
-					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, etal, original, stat_data );
+					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, original, stat_data );
 					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
 					fig_nums_sums.push_back( number_sum );
 				}
@@ -783,6 +844,7 @@ Mat create_gray_image( const Mat& input )
 }
 
 // бьем картинку на фигуры
+template< int stat_data_index >
 vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
 {
 	vector< figure > ret;
@@ -794,7 +856,7 @@ vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
 			if ( mat.at< unsigned char >( nn, mm ) == 0 )
 			{
 				figure fig_to_create;
-				add_pixel_as_spy( nn, mm, mat, fig_to_create );
+				add_pixel_as_spy< stat_data_index >( nn, mm, mat, fig_to_create );
 				if ( fig_to_create.is_valid() )
 				{
 					// проверяем что высота больше ширины
@@ -875,6 +937,7 @@ pair_int search_nearest_black( const Mat& etal, const pair_int& center )
 	}
 }
 
+template< int stat_data_index >
 void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, const Mat& original, number_data& stat_data )
 {
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
@@ -884,12 +947,12 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 		figure top_border_fig;
 		Mat to_search = etal.clone();
 		// Ищем контуры по нижней границе
-		add_pixel_as_spy( nearest_black.second, nearest_black.first, to_search, top_border_fig, -1, nearest_black.second + 1 );
+		add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_search, top_border_fig, stat_data, -1, nearest_black.second + 1 );
 		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
 		{
 			Mat to_contur = etal.clone();
 			figure conture_fig;
-			add_pixel_as_spy( nearest_black.second, nearest_black.first, to_contur, conture_fig, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
+			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_contur, conture_fig, stat_data, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
 			// если у нас рамочка наезжает на цифры, то у нас будет очень широкая фигура
 			if ( conture_fig.width() >= static_cast< int >( avarage_height ) )
 			{
@@ -897,7 +960,7 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 				Mat to_stable = etal.clone();
 				figure short_fig;
 				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
-				add_pixel_as_spy( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
+				add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, stat_data, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
 				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
 			}
 			best_number.figs.push_back( conture_fig );
@@ -1032,6 +1095,7 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	int next_level = find_next_level( found_nums, gray_step );
 	while ( next_level != -1 )
 	{
+		const int64 bb = cv::getTickCount();
 		const vector< found_number > cur_nums = read_number_impl( image, next_level, recog_debug );
 		if ( cur_nums.empty() )
 		{
@@ -1044,6 +1108,7 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 			found_nums[ next_level ] = find_best_number_by_weight( cur_nums );
 		}
 		next_level = find_next_level( found_nums, gray_step );
+//		cout << "LOOP: " << (((double)cv::getTickCount() - bb)/cv::getTickFrequency()) << endl;
 	}
 
 	const int best_level = fine_best_level( found_nums );
@@ -1166,12 +1231,43 @@ void remove_single_pixels( Mat& mat )
 
 vector< found_number > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
 {
+	const int free_index = get_free_index();
+
 	const Mat& gray_image = create_gray_image( input );
 	Mat img_bw = gray_image > gray_level;
 	Mat img_to_rez = img_bw.clone();
 //	remove_single_pixels( img_bw );
 	// ищем фигуры
-	vector< figure > figs = parse_to_figures( img_bw, recog_debug );
+	vector< figure > figs;
+	switch ( free_index )
+	{
+	case 0:
+		figs = parse_to_figures< 0 >( img_bw, recog_debug );
+		break;
+	case 1:
+		figs = parse_to_figures< 1 >( img_bw, recog_debug );
+		break;
+	case 2:
+		figs = parse_to_figures< 2 >( img_bw, recog_debug );
+		break;
+	case 3:
+		figs = parse_to_figures< 3 >( img_bw, recog_debug );
+		break;
+	case 4:
+		figs = parse_to_figures< 4 >( img_bw, recog_debug );
+		break;
+	case 5:
+		figs = parse_to_figures< 5 >( img_bw, recog_debug );
+		break;
+	case 6:
+		figs = parse_to_figures< 6 >( img_bw, recog_debug );
+		break;
+	case 7:
+		figs = parse_to_figures< 7 >( img_bw, recog_debug );
+		break;
+	default:
+		throw runtime_error( "invalid data index" );
+	};
 	// бьем по группам в зависимости от угла наклона элементов отностительно друг друга
 	vector< figure_group > groups = make_groups( figs );
 	// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
@@ -1187,5 +1283,6 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level, recog
 	// ищем номера
 	number_data stat_data;
 	const vector< found_number > nums = search_number( img_to_rez, groups, gray_image, stat_data );
+	set_free_index( free_index );
 	return nums;
 }
