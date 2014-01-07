@@ -40,3 +40,24 @@ inline void draw_points( const std::vector< pair_int >& pis, const cv::Mat& etal
 	}
 	imwrite( next_name( key ), colored_rect );
 }
+
+namespace cv
+{
+	inline bool operator < ( const cv::Rect& lh, const cv::Rect& rh )
+	{
+		return memcmp( &lh, &rh, sizeof( cv::Rect ) ) < 0;
+	}
+}
+
+template< class T >
+std::set< T > to_set( const std::vector< T >& in )
+{
+	std::set< T > out;
+	for ( size_t nn = 0; nn < in.size(); ++nn )
+	{
+		out.insert( in.at( nn ) );
+	}
+	return out;
+}
+
+

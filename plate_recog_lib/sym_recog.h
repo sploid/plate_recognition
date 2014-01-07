@@ -1,7 +1,12 @@
 #pragma once
 #include "plate_recog_lib_config.h"
+#include <string>
 
-#include <opencv2/opencv.hpp>
+namespace cv
+{
+	class Mat;
+}
+class figure;
 
 const int data_width = 15;
 const int data_height = 22;

@@ -7,7 +7,6 @@
 #pragma warning( push )
 #pragma warning( disable : 4127 4512 )
 #include <QDir>
-#include <QSharedPointer>
 #pragma warning( pop )
 #include <QCoreApplication>
 #include <QThreadPool>
@@ -27,14 +26,10 @@ public:
 	process_file_task( const std::string& folder_name, const std::string& file_name )
 		: m_folder_name( folder_name )
 		, m_file_name( file_name )
-		, m_sum( 0 )
 	{
 	}
 
-	int sum() const
-	{
-		return m_sum;
-	}
+	static int m_sum;
 
 private:
 	Q_DISABLE_COPY( process_file_task );
@@ -45,6 +40,7 @@ private:
 		stringstream to_out;
 		to_out << m_file_name.substr( m_folder_name.size() + 1, m_file_name.size() - m_folder_name.size() - 5 ) << "   ";
 		const cv::Mat image = cv::imread( m_file_name.c_str(), CV_LOAD_IMAGE_COLOR );   // Read the file
+		int sum = 0;
 		if( image.data )
 		{
 			const int64 begin = cv::getTickCount();
@@ -56,7 +52,7 @@ private:
 				to_out << "  !!  ";
 			}
 			to_out << endl;
-			m_sum = number.second;
+			sum = number.second;
 		}
 		else
 		{
@@ -65,12 +61,14 @@ private:
 		static QMutex out_locker;
 		QMutexLocker lock( &out_locker );
 		cout << to_out.str();
+		m_sum += sum;
 	}
 
 	const std::string m_folder_name;
 	const std::string m_file_name;
-	int m_sum;
 };
+
+int process_file_task::m_sum = 0;
 
 int main( int argc, char** argv )
 {
@@ -97,21 +95,13 @@ int main( int argc, char** argv )
 		cout << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
 		const QStringList all_files = image_dir.entryList( QStringList() << "*.*", QDir::Files|QDir::Readable );
 		QThreadPool::globalInstance()->setMaxThreadCount( 1 );
-		vector< QSharedPointer< process_file_task > > tasks;
 		for ( int nn = 0; nn < all_files.size(); ++nn )
 		{
 			const string next_file_name = image_folder + "\\" + all_files.at( nn ).toLocal8Bit().data();
-			QSharedPointer< process_file_task > next_task( new process_file_task( image_folder, next_file_name ) );
-			QThreadPool::globalInstance()->start( next_task.data() );
-			tasks.push_back( next_task );
+			QThreadPool::globalInstance()->start( new process_file_task( image_folder, next_file_name ) );
 		}
 		QThreadPool::globalInstance()->waitForDone();
-		int sum = 0;
-		for ( size_t nn = 0; nn < tasks.size(); ++nn )
-		{
-			sum += tasks.at( nn )->sum();
-		}
-		cout << "sum: " << sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
+		cout << "sum: " << process_file_task::m_sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
 
 		cv::waitKey( 1000 );
 	}
