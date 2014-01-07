@@ -74,33 +74,6 @@ int process_file_task::m_sum = 0;
 
 int main( int argc, char** argv )
 {
-	int val1 = rand();
-	int val2 = val1;
-	const int count = 1000000;
-	DWORD dw1 = ::GetTickCount();
-	{
-		static std::vector< int > v1;
-		for ( int nn = 0; nn < count; ++nn )
-		{
-			v1.push_back( val1 + 1 );
-//			val1 = v1[ nn ];
-		}
-	}
-	DWORD dw2 = ::GetTickCount();
-	{
-		std::vector< int > v2;
-		for ( int nn = 0; nn < count; ++nn )
-		{
-			v2.push_back( val2 + 1 );
-//			val2 = v2[ nn ];
-		}
-	}
-	DWORD dw3 = ::GetTickCount();
-	std::cout << ( dw2 - dw1 ) << "  " << ( dw3 - dw2 );
-
-
-
-
 	using namespace std;
 	QCoreApplication a( argc, argv );
 

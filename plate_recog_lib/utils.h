@@ -60,4 +60,22 @@ std::set< T > to_set( const std::vector< T >& in )
 	return out;
 }
 
+class time_mesure
+{
+public:
+	time_mesure( const std::string& title )
+		: m_title( title )
+		, m_begin( cv::getTickCount() )
+	{
+	}
+	~time_mesure()
+	{
+		std::cout << m_title << " " << ( static_cast< double >(cv::getTickCount() - m_begin)/cv::getTickFrequency() ) << std::endl;
+	}
+private:
+	time_mesure( const time_mesure& other );
+	time_mesure& operator=( const time_mesure& other );
+	const std::string m_title;
+	const int64 m_begin;
+};
 
