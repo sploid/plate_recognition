@@ -128,7 +128,7 @@ void set_free_index( int index )
 
 #endif // _WIN32
 
-vector< found_number > read_number_impl( const Mat& image, int grey_level, recog_debug_callback *recog_debug );
+vector< found_number > read_number_impl( const Mat& image, int grey_level );
 
 inline pair_int operator - ( const pair_int& lh, const pair_int& rh )
 {
@@ -846,7 +846,7 @@ Mat create_gray_image( const Mat& input )
 
 // бьем картинку на фигуры
 template< int stat_data_index >
-vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
+vector< figure > parse_to_figures( Mat& mat )
 {
 //	time_mesure to_fig( "TO_FIGS: " );
 	vector< figure > ret;
@@ -1092,13 +1092,13 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 //	}
 }
 
-pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, recog_debug_callback *recog_debug, int gray_step )
+pair< string, int > read_number_loop( const Mat& image, map< int, found_number >& found_nums, int gray_step )
 {
 	int next_level = find_next_level( found_nums, gray_step );
 	while ( next_level != -1 )
 	{
 		const int64 bb = cv::getTickCount();
-		const vector< found_number > cur_nums = read_number_impl( image, next_level, recog_debug );
+		const vector< found_number > cur_nums = read_number_impl( image, next_level );
 		if ( cur_nums.empty() )
 		{
 			found_number num_zero;
@@ -1141,9 +1141,8 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 	}
 }
 
-pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_debug, int gray_step )
+pair< string, int > read_number( const Mat& image, int gray_step )
 {
-	assert( recog_debug );
 	vector< int > first_search_levels;
 	if ( gray_step <= 0 )
 	{
@@ -1181,23 +1180,23 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
 	{
-		const vector< found_number > cur_nums = read_number_impl( image, first_search_levels.at( nn ), recog_debug );
+		const vector< found_number > cur_nums = read_number_impl( image, first_search_levels.at( nn ) );
 		if ( !cur_nums.empty() )
 		{
 			const found_number best_num = find_best_number_by_weight( cur_nums );
 			found_nums[ first_search_levels.at( nn ) ] = best_num;
 			if ( best_num.weight != 0 )
 			{
-				return read_number_loop( image, found_nums, recog_debug, gray_step );
+				return read_number_loop( image, found_nums, gray_step );
 			}
 		}
 	}
 	return make_pair( string( "" ), 0 );
 }
 
-pair< string, int > read_number_by_level( const Mat& image, int gray_level, recog_debug_callback *recog_debug )
+pair< string, int > read_number_by_level( const Mat& image, int gray_level )
 {
-	const vector< found_number > fn = read_number_impl( image, gray_level, recog_debug );
+	const vector< found_number > fn = read_number_impl( image, gray_level );
 	return fn.empty() ? make_pair( string(), 0 ) : find_best_number_by_weight( fn ).to_pair();
 }
 
@@ -1231,7 +1230,7 @@ void remove_single_pixels( Mat& mat )
 	}
 }
 
-vector< found_number > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
+vector< found_number > read_number_impl( const Mat& input, int gray_level )
 {
 	const int free_index = get_free_index();
 
@@ -1244,28 +1243,28 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level, recog
 	switch ( free_index )
 	{
 	case 0:
-		figs = parse_to_figures< 0 >( img_bw, recog_debug );
+		figs = parse_to_figures< 0 >( img_bw );
 		break;
 	case 1:
-		figs = parse_to_figures< 1 >( img_bw, recog_debug );
+		figs = parse_to_figures< 1 >( img_bw );
 		break;
 	case 2:
-		figs = parse_to_figures< 2 >( img_bw, recog_debug );
+		figs = parse_to_figures< 2 >( img_bw );
 		break;
 	case 3:
-		figs = parse_to_figures< 3 >( img_bw, recog_debug );
+		figs = parse_to_figures< 3 >( img_bw );
 		break;
 	case 4:
-		figs = parse_to_figures< 4 >( img_bw, recog_debug );
+		figs = parse_to_figures< 4 >( img_bw );
 		break;
 	case 5:
-		figs = parse_to_figures< 5 >( img_bw, recog_debug );
+		figs = parse_to_figures< 5 >( img_bw );
 		break;
 	case 6:
-		figs = parse_to_figures< 6 >( img_bw, recog_debug );
+		figs = parse_to_figures< 6 >( img_bw );
 		break;
 	case 7:
-		figs = parse_to_figures< 7 >( img_bw, recog_debug );
+		figs = parse_to_figures< 7 >( img_bw );
 		break;
 	default:
 		throw runtime_error( "invalid data index" );

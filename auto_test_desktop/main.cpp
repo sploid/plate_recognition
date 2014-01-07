@@ -14,12 +14,6 @@
 
 #include "sym_recog.h"
 
-struct debug_out : public recog_debug_callback
-{
-	virtual void out_image( const cv::Mat& ) { }
-	virtual void out_string( const std::string& ) { }
-};
-
 class process_file_task : public QRunnable
 {
 public:
@@ -44,8 +38,7 @@ private:
 		if( image.data )
 		{
 			const int64 begin = cv::getTickCount();
-			debug_out rc;
-			const pair< string, int > number = read_number( image, &rc, 10 );
+			const pair< string, int > number = read_number( image, 10 );
 			to_out << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency());
 			if ( m_file_name.find( number.first ) == string::npos )
 			{
