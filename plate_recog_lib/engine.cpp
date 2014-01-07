@@ -272,7 +272,7 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 	g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = col;
 
 	// что бы не зациклилось
-	mat.at< unsigned char >( row, col ) = 255;
+	mat.ptr< unsigned char >( row )[ col ] = 255;
 	int cur_index = 0;
 	while ( cur_index < g_points_count[ stat_data_index ] )
 	{
@@ -280,17 +280,18 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 		const int& cur_mm = g_points_dublicate_second[ stat_data_index ][ cur_index ];
 		for ( size_t yy = 0; yy < sizeof( g_pix_around[ 0 ] ) / sizeof( g_pix_around[ 0 ][ 0 ] ); ++yy )
 		{
-			int curr_pix_a[ 2 ] = { g_pix_around[ stat_data_index ][ yy ].first + cur_nn, g_pix_around[ stat_data_index ][ yy ].second + cur_mm };
-			if ( curr_pix_a[ 0 ] >= top_border && curr_pix_a[ 0 ] < bottom_border
-				&& curr_pix_a[ 1 ] >= 0 && curr_pix_a[ 1 ] < mat.cols )
+			const int &curr_pix_first = g_pix_around[ stat_data_index ][ yy ].first + cur_nn;
+			const int &curr_pix_second = g_pix_around[ stat_data_index ][ yy ].second + cur_mm;
+			if ( curr_pix_first >= top_border && curr_pix_first < bottom_border
+				&& curr_pix_second >= 0 && curr_pix_second < mat.cols )
 			{
-				if ( mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) == 0 )
+				if ( mat.ptr< unsigned char >( curr_pix_first )[ curr_pix_second ] == 0 )
 				{
-					g_points_dublicate_first[ stat_data_index ][ g_points_count[ stat_data_index ] ] = curr_pix_a[ 0 ];
-					g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = curr_pix_a[ 1 ];
-					fig.add_point( pair_int( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
+					g_points_dublicate_first[ stat_data_index ][ g_points_count[ stat_data_index ] ] = curr_pix_first;
+					g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = curr_pix_second;
+					fig.add_point( pair_int( curr_pix_first, curr_pix_second ) );
 					// что бы не зациклилось
-					mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) = 255;
+					mat.ptr< unsigned char >( curr_pix_first )[ curr_pix_second ] = 255;
 				}
 			}
 		}
@@ -847,6 +848,7 @@ Mat create_gray_image( const Mat& input )
 template< int stat_data_index >
 vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
 {
+//	time_mesure to_fig( "TO_FIGS: " );
 	vector< figure > ret;
 	ret.reserve( 1000 );
 	for ( int nn = 0; nn < mat.rows; ++nn )
@@ -875,7 +877,7 @@ vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
 		}
 	}
 	// отрисовываем найденные фигуры
-	if ( !ret.empty() )
+/*	if ( !ret.empty() )
 	{
 		Mat colored_mat( mat.size(), CV_8UC3 );
 		cvtColor( mat, colored_mat, CV_GRAY2RGB );
@@ -884,7 +886,7 @@ vector< figure > parse_to_figures( Mat& mat, recog_debug_callback *recog_debug )
 			rectangle( colored_mat, Point( ret[ nn ].left(), ret[ nn ].top() ), Point( ret[ nn ].right(), ret[ nn ].bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
 		recog_debug->out_image( colored_mat );
-	}
+	}*/
 	sort( ret.begin(), ret.end(), less_by_left_pos );
 	return ret;
 }
@@ -1120,13 +1122,13 @@ pair< string, int > read_number_loop( const Mat& image, map< int, found_number >
 		search_region( best_number, gray_image > best_level, gray_image );
 
 		// рисуем квадрат номера
-		Mat num_rect_image = image.clone();
+/*		Mat num_rect_image = image.clone();
 		for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
 		{
 			const figure& cur_fig = best_number.figs[ nn ];
 			rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
 		}
-		recog_debug->out_image( num_rect_image );
+		recog_debug->out_image( num_rect_image );*/
 
 //		imwrite( "C:\\imgs\\debug\\0.png", num_rect_image );
 //		imwrite( "C:\\imgs\\debug\\1.png", gray_image > best_level );
