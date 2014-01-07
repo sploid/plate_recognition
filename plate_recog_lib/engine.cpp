@@ -137,7 +137,7 @@ bool angle_is_equal( int an1, int an2 )
 	return false;
 }
 
-pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original )
+pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original, number_data& stat_data )
 {
 	const int left = fig.left();
 	int right = left + fig.width() + 1;
@@ -155,24 +155,21 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 
 	const cv::Rect sym_border( left, top, right - left, bottom - top );
 
-	typedef pair< char, double > ret_typ;
-	static const Mat* cache_origin = 0;
-	static map< pair< cv::Rect, bool >, ret_typ > cache_rets;
-	if ( cache_origin != &original )
+	if ( stat_data.m_cache_origin != &original )
 	{
-		cache_rets.clear();
-		cache_origin = &original;
+		stat_data.m_cache_rets.clear();
+		stat_data.m_cache_origin = &original;
 	}
 
-	map< pair< cv::Rect, bool >, ret_typ >::const_iterator it = cache_rets.find( make_pair( sym_border, num ) );
-	if ( it != cache_rets.end() )
+	map< pair< cv::Rect, bool >, pair< char, double >  >::const_iterator it = stat_data.m_cache_rets.find( make_pair( sym_border, num ) );
+	if ( it != stat_data.m_cache_rets.end() )
 	{
 		return it->second;
 	}
 
 	Mat mm( original, sym_border );
-	ret_typ ret = num ? proc_num( mm ) : proc_char( mm );
-	cache_rets[ make_pair( sym_border, num ) ] = ret;
+	pair< char, double >  ret = num ? proc_num( mm ) : proc_char( mm );
+	stat_data.m_cache_rets[ make_pair( sym_border, num ) ] = ret;
 	return ret;
 }
 
@@ -180,6 +177,8 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 // выбираем пиксели что бы получить контур, ограниченный белыми пикселями
 void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border = -1, int bottom_border = -1 )
 {
+//	imwrite("C:\\imgs\\debug\\0.png", mat );
+	int64 bb = cv::getTickCount();
 	if ( top_border == -1 ) // верняя граница поиска
 	{
 		top_border = 0;
@@ -190,9 +189,9 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 	}
 	static vector< pair_int > points_dublicate;
 	static vector< pair_int > pix_around( 4 );
-	static bool init = false;
+/*	static bool init = false;
 	if ( !init )
-	{
+	{*/
 /*		pix_around[ 0 ] = make_pair( cur_nn, cur_mm + 1 );
 		pix_around[ 1 ] = make_pair( cur_nn - 1, cur_mm );
 		pix_around[ 2 ] = make_pair( cur_nn + 1, cur_mm );
@@ -201,10 +200,9 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 		pix_around[ 1 ] = make_pair( - 1, 0 );
 		pix_around[ 2 ] = make_pair( 1, 0 );
 		pix_around[ 3 ] = make_pair( 0, - 1 );
-		points_dublicate.reserve( 10000 );
-		init = true;
-	}
-
+//		points_dublicate.reserve( 10000 );
+/*		init = true;
+	}*/
 
 	fig.add_point( pair_int( row, col ) );
 	points_dublicate.clear();
@@ -220,24 +218,23 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 		for ( size_t yy = 0; yy < pix_around.size(); ++yy )
 		{
 			int curr_pix_a[ 2 ] = { pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm };
-//			const std_pair_int cur_pix( make_pair( pix_around[ yy ].first + cur_nn, pix_around[ yy ].second + cur_mm ) );
 			if ( curr_pix_a[ 0 ] >= top_border && curr_pix_a[ 0 ] < bottom_border
 				&& curr_pix_a[ 1 ] >= 0 && curr_pix_a[ 1 ] < mat.cols )
 			{
 				if ( mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) == 0 )
 				{
-//					if ( !fig.contains( cur_pix ) )
-					{
-						points_dublicate.push_back( make_pair( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
-						fig.add_point( make_pair( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
-						// что бы не зациклилось
-						mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) = 255;
-					}
+					points_dublicate.push_back( pair_int( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
+					fig.add_point( pair_int( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) );
+					// что бы не зациклилось
+					mat.at< unsigned char >( curr_pix_a[ 0 ], curr_pix_a[ 1 ] ) = 255;
 				}
 			}
 		}
 		++cur_index;
 	}
+	int be = cv::getTickCount();
+//	cout << (((double)cv::getTickCount() - bb)/cv::getTickFrequency()) * 1000.;
+	int t = 0;
 }
 
 bool fig_less_left( const figure& lf, const figure& rf )
@@ -578,7 +575,7 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 	return ret;
 }
 
-vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pair_int& pos_center, const figure_group& cur_gr, Mat& etal, const Mat& original )
+vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pair_int& pos_center, const figure_group& cur_gr, Mat& etal, const Mat& original, number_data& stat_data )
 {
 //	draw_figures( cur_gr, etal );
 	vector< found_symbol > ret;
@@ -595,7 +592,7 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pa
 			&& procs_figs.find( next.fig  ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
-			const pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original );
+			const pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original, stat_data );
 			assert( cc.first != 0 );
 			next.pos_in_pis_index = kk;
 			next.symbol = cc.first;
@@ -611,7 +608,7 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pa
 	return ret;
 }
 
-vector< found_number > search_number( Mat& etal, vector< figure_group >& groups, const Mat& original )
+vector< found_number > search_number( Mat& etal, vector< figure_group >& groups, const Mat& original, number_data& stat_data )
 {
 	// ищем позиции фигур и соответсвующие им символы
 	vector< found_number > ret;
@@ -632,7 +629,7 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 				{
 					const vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
 					assert( pis.size() == 6 ); // всегда 6 символов без региона в номере
-					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, etal, original );
+					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, etal, original, stat_data );
 					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
 					fig_nums_sums.push_back( number_sum );
 				}
@@ -878,7 +875,7 @@ pair_int search_nearest_black( const Mat& etal, const pair_int& center )
 	}
 }
 
-void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, const Mat& original )
+void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, const Mat& original, number_data& stat_data )
 {
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
 	if ( nearest_black.first != -1
@@ -905,7 +902,7 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 			}
 			best_number.figs.push_back( conture_fig );
 //			const pair< char, double > sym_sym = find_sym_legacy( true, conture_fig, etal );
-			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, original );
+			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, original, stat_data );
 			if ( sym_sym.first != 0 )
 			{
 				best_number.number += sym_sym.first;
@@ -1188,6 +1185,7 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level, recog
 	// сливаем пересекающиеся группы
 	groups_merge_intersects( groups );
 	// ищем номера
-	const vector< found_number > nums = search_number( img_to_rez, groups, gray_image );
+	number_data stat_data;
+	const vector< found_number > nums = search_number( img_to_rez, groups, gray_image, stat_data );
 	return nums;
 }
