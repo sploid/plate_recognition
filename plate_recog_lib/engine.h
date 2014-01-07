@@ -8,12 +8,6 @@ namespace cv
 	class Mat;
 }
 
-struct recog_debug_callback
-{
-	virtual void out_image( const cv::Mat& image ) = 0;
-	virtual void out_string( const std::string& text ) = 0;
-};
-
 // @todo: сделать документацию
 // @todo: увеличить скорость разбития картинки на фигуры
 // @todo: отрефакторить что бы не висло на картинке C967PO190.jpg
@@ -26,5 +20,5 @@ struct recog_debug_callback
 // @todo: M520PX190.jpg - большой угол и слева шуруп, поэтому левая буква М не распознается
 
 // если gray_step == -1, то использует некоторый алгоритм поиска оптимльной яркости, в ином случае просто идет по шагам
-std::pair< std::string, int > PLATE_RECOG_EXPORT read_number( const cv::Mat& image, recog_debug_callback *recog_debug, int gray_step = 0 );
-std::pair< std::string, int > PLATE_RECOG_EXPORT read_number_by_level( const cv::Mat& image, int gray_level, recog_debug_callback *recog_debug );
+std::pair< std::string, int > PLATE_RECOG_EXPORT read_number( const cv::Mat& image, int gray_step = 0 );
+std::pair< std::string, int > PLATE_RECOG_EXPORT read_number_by_level( const cv::Mat& image, int gray_level );

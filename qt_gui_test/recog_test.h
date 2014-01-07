@@ -21,7 +21,7 @@
 #include <opencv2/opencv.hpp>
 #include "engine.h"
 
-class recog_test : public QDialog, public recog_debug_callback
+class recog_test : public QDialog
 {
 	Q_OBJECT
 

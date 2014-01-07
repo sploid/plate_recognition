@@ -68,7 +68,7 @@ void recog_test::on_m_but_left_clicked()
 void recog_test::on_m_but_run_clicked()
 {
 	using namespace std;
-	const pair< string, int > num = read_number_by_level( QImage2cvMat( cur_image() ), ui.m_le_row_num->text().toInt(), this );
+	const pair< string, int > num = read_number_by_level( QImage2cvMat( cur_image() ), ui.m_le_row_num->text().toInt() );
 	stringstream stream;
 	if ( num.first.empty() )
 	{
