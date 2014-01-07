@@ -1,6 +1,8 @@
 #include "sym_recog.h"
 #include <opencv2/opencv.hpp>
 #include "utils.h"
+#include "syms.h"
+#include "figure.h"
 
 using namespace cv;
 using namespace std;
@@ -215,3 +217,4 @@ void read_nn_config( const std::string& num_file_name, const std::string& char_f
 	init_nn( aux::mlp_char, char_file_name );
 	init_nn( aux::mlp_num, num_file_name );
 }
+

@@ -4,131 +4,11 @@
 #include "syms.h"
 #include "sym_recog.h"
 #include "utils.h"
+#include "figure.h"
+#include "number_data.h"
 
 using namespace cv;
 using namespace std;
-
-class figure
-{
-public:
-	figure()
-		: m_left( -1 )
-		, m_right( -1 )
-		, m_top( -1 )
-		, m_bottom( -1 )
-		, m_too_big( false )
-	{
-	}
-	figure( pair_int center, pair_int size )
-		: m_left( center.first - size.first / 2 - 1 )
-		, m_right( center.first + size.first / 2 + 1 )
-		, m_top( center.second - size.second / 2 - 1 )
-		, m_bottom( center.second + size.second / 2 + 1 )
-		, m_too_big( false )
-	{
-	}
-	int width() const
-	{
-		return m_right - m_left;
-	}
-	int height() const
-	{
-		return m_bottom - m_top;
-	}
-	bool is_empty() const
-	{
-		return m_left == -1 && m_right == -1 && m_top == -1 && m_bottom == -1;
-	}
-	void add_point( const pair_int& val )
-	{
-		if ( too_big() )
-			return;
-		if ( m_left == - 1 || m_left > val.second )
-		{
-			m_left = val.second;
-		}
-		if ( m_top == - 1 || m_top > val.first )
-		{
-			m_top = val.first;
-		}
-		if ( m_right == - 1 || m_right < val.second )
-		{
-			m_right = val.second;
-		}
-		if ( m_bottom == - 1 || m_bottom < val.first )
-		{
-			m_bottom = val.first;
-		}
-		if ( right() - left() > 50 )
-		{
-			m_too_big = true;
-		}
-	}
-	pair_int center() const
-	{
-		const int hor = m_left + ( m_right - m_left ) / 2;
-		const int ver = m_top + ( m_bottom - m_top ) / 2;
-		return make_pair( hor, ver );
-	}
-	pair_int top_left() const
-	{
-		return make_pair( left(), top() );
-	}
-	int left() const
-	{
-		return m_left;
-	}
-	int top() const
-	{
-		return m_top;
-	}
-	int right() const
-	{
-		return m_right;
-	}
-	int bottom() const
-	{
-		return m_bottom;
-	}
-	pair_int bottom_right() const
-	{
-		return make_pair( right(), bottom() );
-	}
-	bool is_valid() const
-	{
-		return !m_too_big && !is_empty();
-	}
-	bool too_big() const
-	{
-		return m_too_big;
-	}
-	bool operator<( const figure & other ) const
-	{
-		if ( m_left != other.m_left )
-			return m_left < other.m_left;
-		else if ( m_top != other.m_top )
-			return m_top < other.m_top;
-		else if ( m_right != other.m_right )
-			return m_right < other.m_right;
-		else if ( m_bottom != other.m_bottom )
-			return m_bottom < other.m_bottom;
-		else
-			return false;
-	}
-	bool operator==( const figure & other ) const
-	{
-		return m_left == other.m_left
-			&& m_right == other.m_right
-			&& m_top == other.m_top
-			&& m_bottom == other.m_bottom;
-	}
-private:
-	int m_left;
-	int m_right;
-	int m_top;
-	int m_bottom;
-	bool m_too_big;
-};
 
 // найденный номер
 struct found_number
@@ -257,179 +137,6 @@ bool angle_is_equal( int an1, int an2 )
 	return false;
 }
 
-typedef map< pair< bool, figure >, pair< char, double > > clacs_figs_type;
-clacs_figs_type calcs_figs;
-
-double calc_sym( const Mat& cur_mat, const vector< vector< float > >& sym )
-{
-	const int wid = sym.at( 0 ).size();
-	const int hei = sym.size();
-	Mat dest_mat( Size( wid, hei ), CV_8U );
-	resize( cur_mat, dest_mat, Size( wid, hei ) );
-	dest_mat = dest_mat > 128;
-	double sum = 0.;
-	for ( int xx = 0; xx < wid; ++xx )
-	{
-		for ( int yy = 0; yy < hei; ++yy )
-		{
-			double koef = sym.at( yy ).at( xx );
-/*			if ( koef < 0 )
-				koef = -1.;
-			if ( koef > 0 )
-				koef = 1.;*/
-//			комбинированный
-			//qreal val = 0.;
-			//if ( koef < 0 )
-			//{
-			//	koef = -1.;
-			//	// должно быть белым
-			//	val = dest_mat.at< quint8 >( yy, xx );
-			//}
-			//else
-			//{
-			//	// должно быть черным
-			//	val = 255 - dest_mat. at< quint8 >( yy, xx );
-			//}
-			//sum += koef * val;
-//			по белому
-//			qreal val = dest_mat. at< quint8 >( yy, xx );
-//			sum += -1. * val * koef;
-//			по черному
-			double val = 255 - dest_mat. at< unsigned char >( yy, xx );
-			sum += val * koef;
-		}
-	}
-	return sum;
-}
-
-pair< char, double > find_sym_legacy( bool num, const figure& fig, const Mat& etal )
-{
-	clacs_figs_type::const_iterator it = calcs_figs.find( make_pair( num, fig ) );
-	if ( it != calcs_figs.end() )
-	{
-		return it->second;
-	}
-
-	typedef vector< vector< float > > sym_def;
-	static vector< sym_def > num_syms;
-	if ( num_syms.empty() )
-	{
-		num_syms.push_back( std_sym0() );
-		num_syms.push_back( std_sym1() );
-		num_syms.push_back( std_sym2() );
-		num_syms.push_back( std_sym3() );
-		num_syms.push_back( std_sym4() );
-		num_syms.push_back( std_sym5() );
-		num_syms.push_back( std_sym6() );
-		num_syms.push_back( std_sym7() );
-		num_syms.push_back( std_sym8() );
-		num_syms.push_back( std_sym9() );
-	}
-	static vector< sym_def > let_syms;
-	if ( let_syms.empty() )
-	{
-		let_syms.push_back( std_symA() );
-		let_syms.push_back( std_symB() );
-		let_syms.push_back( std_symC() );
-		let_syms.push_back( std_symE() );
-		let_syms.push_back( std_symH() );
-		let_syms.push_back( std_symK() );
-		let_syms.push_back( std_symM() );
-		let_syms.push_back( std_symO() );
-		let_syms.push_back( std_symP() );
-		let_syms.push_back( std_symT() );
-		let_syms.push_back( std_symX() );
-		let_syms.push_back( std_symY() );
-	}
-	vector< sym_def > * cur_syms = num ? &num_syms : &let_syms;
-	// подсчитываем кол-во
-	float min_sum_full_syms = 0;
-	vector< float > sums_syms_elements;
-	for ( size_t nn = 0; nn < cur_syms->size(); ++nn )
-	{
-		float cur_val = 0;
-		for ( size_t mm = 0; mm < cur_syms->at( nn ).size(); ++mm )
-		{
-			for ( size_t kk = 0; kk < cur_syms->at( nn ).at( mm ).size(); ++kk )
-			{
-				if ( cur_syms->at( nn ).at( mm ).at( kk ) > 0 )
-					cur_val += cur_syms->at( nn ).at( mm ).at( kk );
-			}
-		}
-		sums_syms_elements.push_back( cur_val );
-		if ( min_sum_full_syms == 0
-			|| min_sum_full_syms > cur_val )
-		{
-			min_sum_full_syms = cur_val;
-		}
-	}
-	for ( size_t nn = 0; nn < sums_syms_elements.size(); ++nn )
-	{
-		sums_syms_elements[ nn ] = (float)min_sum_full_syms / sums_syms_elements[ nn ];
-	}
-
-	Mat cur_mat( etal, Rect( fig.left(), fig.top(), fig.width() + 1, fig.height() + 1 ) );
-	int best_index = -1;
-	double max_sum = 0.;
-	for ( size_t kk = 0; kk < cur_syms->size(); ++kk )
-	{
-		const double cur_sum = calc_sym( cur_mat, cur_syms->at( kk ) ) * sums_syms_elements.at( kk );
-		if ( cur_sum > max_sum )
-		{
-			max_sum = cur_sum;
-			best_index = kk;
-		}
-	}
-	pair< char, double > ret;
-
-	if ( num )
-	{
-		switch ( best_index )
-		{
-		case 0: ret = make_pair( '0', max_sum ); break;
-		case 1: ret = make_pair( '1', max_sum ); break;
-		case 2: ret = make_pair( '2', max_sum ); break;
-		case 3: ret = make_pair( '3', max_sum ); break;
-		case 4: ret = make_pair( '4', max_sum ); break;
-		case 5: ret = make_pair( '5', max_sum ); break;
-		case 6: ret = make_pair( '6', max_sum ); break;
-		case 7: ret = make_pair( '7', max_sum ); break;
-		case 8: ret = make_pair( '8', max_sum ); break;
-		case 9: ret = make_pair( '9', max_sum ); break;
-		default: ret = make_pair( (char)0, max_sum ); break;
-		}
-	}
-	else
-	{
-		switch ( best_index )
-		{
-		case 0: ret = make_pair( 'A', max_sum ); break;
-		case 1: ret = make_pair( 'B', max_sum ); break;
-		case 2: ret = make_pair( 'C', max_sum ); break;
-		case 3: ret = make_pair( 'E', max_sum ); break;
-		case 4: ret = make_pair( 'H', max_sum ); break;
-		case 5: ret = make_pair( 'K', max_sum ); break;
-		case 6: ret = make_pair( 'M', max_sum ); break;
-		case 7: ret = make_pair( 'O', max_sum ); break;
-		case 8: ret = make_pair( 'P', max_sum ); break;
-		case 9: ret = make_pair( 'T', max_sum ); break;
-		case 10: ret = make_pair( 'X', max_sum ); break;
-		case 11: ret = make_pair( 'Y', max_sum ); break;
-		default: ret = make_pair( (char)0, max_sum ); break;
-		}
-	}
-	calcs_figs[ make_pair( num, fig ) ] = ret;
-	return ret;
-}
-
-namespace cv
-{
-	inline bool operator < ( const cv::Rect& lh, const cv::Rect& rh )
-	{
-		return memcmp( &lh, &rh, sizeof( cv::Rect ) ) < 0;
-	}
-}
-
 pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original )
 {
 	const int left = fig.left();
@@ -543,8 +250,6 @@ bool less_by_left_pos( const figure& lf, const figure& rf )
 	return fig_less_left( lf, rf );
 }
 
-typedef vector< figure > figure_group;
-
 void draw_figures( const figure_group& figs, const Mat& etal, const string& key = "figs" )
 {
 	Mat colored_rect( etal.size(), CV_8UC3 );
@@ -568,17 +273,6 @@ figure find_figure( const figure_group& gr, const pair_int& pos )
 		}
 	}
 	return figure();
-}
-
-template< class T >
-set< T > to_set( const vector< T >& in )
-{
-	set< T > out;
-	for ( size_t nn = 0; nn < in.size(); ++nn )
-	{
-		out.insert( in.at( nn ) );
-	}
-	return out;
 }
 
 // Выкидываем группы, которые включают в себя другие группы
@@ -901,7 +595,6 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pa
 			&& procs_figs.find( next.fig  ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
-//			const pair< char, double > cc = find_sym_legacy( kk >= 1 && kk <= 3, next.fig, etal );
 			const pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original );
 			assert( cc.first != 0 );
 			next.pos_in_pis_index = kk;
@@ -935,7 +628,6 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 			for ( int ll = 0; ll < 1; ++ll )
 			{
 				// меняем угол наклона номера относительно нас (0 - смотрим прям на номер, если угол меньше 0, то определяем номер с 2-х значным регионом)
-//				int oo = -10;
 				for ( int oo = -60; oo < 50; oo += 10 )
 				{
 					const vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
@@ -1416,7 +1108,6 @@ pair< string, int > read_number( const Mat& image, recog_debug_callback *recog_d
 	}
 //	first_search_levels.clear();
 //	first_search_levels.push_back( 130 );
-//	Проверить почему у мерина последняя цифра региона определилась не верно 
 
 	map< int, found_number > found_nums;
 	for ( size_t nn = 0; nn < first_search_levels.size(); ++nn )
@@ -1446,7 +1137,6 @@ pair< string, int > read_number_by_level( const Mat& image, int gray_level, reco
 	return fn.empty() ? make_pair( string(), 0 ) : find_best_number_by_weight( fn ).to_pair();
 }
 
-// вырезаем одиночные пиксели
 void remove_single_pixels( Mat& mat )
 {
 	for ( int nn = 0; nn < mat.rows; ++nn )
@@ -1479,7 +1169,6 @@ void remove_single_pixels( Mat& mat )
 
 vector< found_number > read_number_impl( const Mat& input, int gray_level, recog_debug_callback *recog_debug )
 {
-	calcs_figs.clear();
 	const Mat& gray_image = create_gray_image( input );
 	Mat img_bw = gray_image > gray_level;
 	Mat img_to_rez = img_bw.clone();
