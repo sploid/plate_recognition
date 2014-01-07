@@ -116,6 +116,7 @@ public:
 			&& m_top == other.m_top
 			&& m_bottom == other.m_bottom;
 	}
+
 private:
 	int m_left;
 	int m_right;
