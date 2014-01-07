@@ -13,6 +13,8 @@
 #include <QThreadPool>
 #include <QMutex>
 
+#include "sym_recog.h"
+
 struct debug_out : public recog_debug_callback
 {
 	virtual void out_image( const cv::Mat& ) { }
@@ -28,15 +30,12 @@ public:
 		, m_sum( 0 )
 	{
 	}
-	virtual ~process_file_task()
-	{
-		int t = 0;
-	}
 
 	int sum() const
 	{
 		return m_sum;
 	}
+
 private:
 	Q_DISABLE_COPY( process_file_task );
 
@@ -83,6 +82,11 @@ int main( int argc, char** argv )
 		cout << "usage: auto_test_desktop image_folder";
 		return 1;
 	}
+
+	const string nn_config_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../other" ).toLocal8Bit() );
+
+	read_nn_config( nn_config_folder + "\\neural_net_num.yml", nn_config_folder + "\\neural_net_char.yml" );
+
 	const int64 begin = cv::getTickCount();
 	const string image_folder( argv[ 1 ] );
 	// грузим список картинок
