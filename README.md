@@ -33,5 +33,5 @@ Qt - Interaction with the OS
 Build with qmake
 -------
 1. In file "opencv.pri" set path to OpenCV.
-2. 
+
 2. In file "opencv.pri" set version of OpenCV.
