@@ -1,37 +1,33 @@
-Automatic number plate recognition
+Automatic number plate recognition library
 =================
-ANPR open source library ( C++ )
+Cross-platform ANPR open source library ( C++ )
 
-Compilers
--------
-Visual Studio 2012 - norm
-
-Visual Studio 2013 - norm
-
-mingw-g++ - norm
-
-Android NDK - not tested yet
+[Measuring recognition](https://github.com/sploid/plate_recognition/blob/master/Measurements.md)
 
 Support platforms
 -------
-Windows - norm
+* Windows - norm
+* Android - not tested yet, but should support
+* iOS - not tested yet, but should support
+* Mac - not tested yet, but should support
+* Linux - not tested yet, but should support
 
-Android - not tested yet
-
-iOS - not tested yet
-
-Mac - not tested yet
-
-Linux - not tested yet
+Compilers
+-------
+* Visual Studio 2012 - norm
+* Visual Studio 2013 - norm
+* mingw-g++ - norm
+* Android NDK - not tested yet, but should support
 
 Dependencies
 -------
-OpenCV - Image processing
-Qt - Interaction with the OS
+* OpenCV for image processing
+* Qt for interaction with the OS
+
+Recognition library depends only on OpenCV
 
 
 Build with qmake
 -------
 1. In file "opencv.pri" set path to OpenCV.
-
 2. In file "opencv.pri" set version of OpenCV.
