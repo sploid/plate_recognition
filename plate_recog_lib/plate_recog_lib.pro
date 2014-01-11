@@ -10,11 +10,14 @@ TEMPLATE = lib
 
 HEADERS = \
 		engine.h \
+		plate_recog_lib_config.h \
+		sym_recog.h \
 		syms.h \
-		plate_recog_lib_config.h
+		utils.h
 SOURCES = \
 		engine.cpp \
-		syms.cpp
+		syms.cpp \
+		sym_recog.cpp
 
 include(../opencv.pri)
 
