@@ -780,7 +780,7 @@ vector< figure > parse_to_figures( Mat& mat )
 			{
 				figure fig_to_create;
 				add_pixel_as_spy< stat_data_index >( nn, mm, mat, fig_to_create );
-				if ( fig_to_create.is_valid() )
+				if ( fig_to_create.is_too_big() )
 				{
 					// проверяем что высота больше ширины
 					if ( fig_to_create.width() < fig_to_create.height() )
@@ -860,9 +860,26 @@ pair_int search_nearest_black( const Mat& etal, const pair_int& center )
 	}
 }
 
- template< int stat_data_index >
-void add_region( found_number& best_number, const Mat& etal, const Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
- {
+struct sym_info
+{
+	sym_info()
+		: m_symbol( '?' )
+		, m_weight( 0. )
+	{
+	}
+	bool is_valid() const
+	{
+		return m_symbol != '?' && m_fig.is_empty();
+	}
+	char m_symbol;
+	double m_weight;
+	figure m_fig;
+};
+
+template< int stat_data_index >
+sym_info search_region_symbol( const found_number& best_number, const Mat& etal, const Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
+{
+	sym_info ret;
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
 //	best_number.figs.push_back( figure( nearest_black, pair_int( 0, 0 ) ) );
 //	return;
@@ -895,11 +912,12 @@ void add_region( found_number& best_number, const Mat& etal, const Mat& origin, 
 			}
 			if ( find( best_number.figs.begin(), best_number.figs.end(), conture_fig ) == best_number.figs.end() )
 			{
-				best_number.figs.push_back( conture_fig );
+				ret.m_fig = conture_fig;
 				const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
 				if ( sym_sym.first != 0 )
 				{
-					best_number.number += sym_sym.first;
+					ret.m_symbol = sym_sym.first;
+					ret.m_weight = sym_sym.second;
 				}
 				else
 				{
@@ -945,6 +963,49 @@ void add_region( found_number& best_number, const Mat& etal, const Mat& origin, 
 	{
 		best_number.number += '?';
 	}
+	return ret;
+}
+
+pair_int calc_center( const vector< figure >& figs, const vector< vector< pair_doub > >& data, int index )
+{
+	const static int figs_size = 6;
+	assert( figs.size() >= figs_size );
+	pair_int ret( 0, 0 );
+	for ( size_t nn = 0; nn < figs_size; ++nn )
+	{
+		ret = ret + figs.at( nn ).center() + pair_int( static_cast< int >( data[ nn ][ index ].first ), static_cast< int >( data[ nn ][ index ].second ) );
+	}
+	ret = ret / figs_size;
+	return ret;
+}
+
+void apply_angle( const vector< figure >& figs, vector< vector< pair_doub > >& data, double avarage_height, double sin_avarage_angle_by_y )
+{
+	// перемножаем все коэффициенты что бы получить реальное значение смещения в пикселях
+	const double diff_by_x_2_sym = data[ 0 ][ 0 ].first - data[ data.size() - 1 ][ 0 ].first;
+	const double koef_by_x_2_sym = ( ( figs.at( figs.size() - 1 ).center().first - figs.at( 0 ).center().first ) / avarage_height ) / diff_by_x_2_sym;
+	for ( size_t nn = 0; nn < data.size(); ++nn )
+	{
+		for ( size_t mm = 0; mm < data[ nn ].size(); ++mm )
+		{
+			data[ nn ][ mm ].first = data[ nn ][ mm ].first * avarage_height * koef_by_x_2_sym;
+			const double angle_offset = sin_avarage_angle_by_y * data[ nn ][ mm ].first;
+			data[ nn ][ mm ].second = data[ nn ][ mm ].second * avarage_height + angle_offset;
+		}
+	}
+}
+
+vector< vector< pair_doub > > get_2_sym_reg_koef( const vector< figure >& figs, double avarage_height, double sin_avarage_angle_by_y )
+{
+	vector< vector< pair_doub > > ret;
+	fill_reg( ret, 6.7656, -0.4219, 7.5363, -0.3998 );
+	fill_reg( ret, 5.6061, -0.2560, 6.3767, -0.2338 );
+	fill_reg( ret, 4.6016, -0.2991, 5.3721, -0.2769 );
+	fill_reg( ret, 3.5733, -0.3102, 4.3440, -0.2880 );
+	fill_reg( ret, 2.4332, -0.4802, 3.2039, -0.4580 );
+	fill_reg( ret, 1.4064, -0.5123, 2.1770, -0.4901 );
+	apply_angle( figs, ret, avarage_height, sin_avarage_angle_by_y );
+	return ret;
 }
 
 template< int stat_data_index >
@@ -977,47 +1038,14 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 	avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
 	const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
 
-/*	{
-		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
-		vector< vector< pair_doub > > move_reg_by_2_sym_reg;
-		fill_reg( move_reg_by_2_sym_reg, 6.7656, -0.4219, 7.5363, -0.3998 );
-		fill_reg( move_reg_by_2_sym_reg, 5.6061, -0.2560, 6.3767, -0.2338 );
-		fill_reg( move_reg_by_2_sym_reg, 4.6016, -0.2991, 5.3721, -0.2769 );
-		fill_reg( move_reg_by_2_sym_reg, 3.5733, -0.3102, 4.3440, -0.2880 );
-		fill_reg( move_reg_by_2_sym_reg, 2.4332, -0.4802, 3.2039, -0.4580 );
-		fill_reg( move_reg_by_2_sym_reg, 1.4064, -0.5123, 2.1770, -0.4901 );
-
-		// перемножаем все коэффициенты что бы получить реальное значение смещения в пикселях
-		const double diff_by_x_2_sym = move_reg_by_2_sym_reg[ 0 ][ 0 ].first - move_reg_by_2_sym_reg[ move_reg_by_2_sym_reg.size() - 1 ][ 0 ].first;
-		const double koef_by_x_2_sym = ( ( figs.at( figs.size() - 1 ).center().first - figs.at( 0 ).center().first ) / avarage_height ) / diff_by_x_2_sym;
-		for ( size_t nn = 0; nn < move_reg_by_2_sym_reg.size(); ++nn )
-		{
-			for ( size_t mm = 0; mm < move_reg_by_2_sym_reg[ nn ].size(); ++mm )
-			{
-				move_reg_by_2_sym_reg[ nn ][ mm ].first = move_reg_by_2_sym_reg[ nn ][ mm ].first * avarage_height * koef_by_x_2_sym;
-				const double angle_offset = sin_avarage_angle_by_y * move_reg_by_2_sym_reg[ nn ][ mm ].first;
-				move_reg_by_2_sym_reg[ nn ][ mm ].second = move_reg_by_2_sym_reg[ nn ][ mm ].second * avarage_height + angle_offset;
-			}
-		}
-
-		// рисуем позиции 2-х символьного региона
-		const size_t figs_size = figs.size();
-		pair_int sum_first( 0, 0 );
-		pair_int sum_second( 0, 0 );
-		for ( size_t nn = 0; nn < figs_size; ++nn )
-		{
-			sum_first = sum_first + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 0 ].first ), static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 0 ].second ) );
-			sum_second = sum_second + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 1 ].first ), static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 1 ].second ) );
-		}
-		sum_first = sum_first / 6;
-		sum_second = sum_second / 6;
-
-		// ищем цифры 2-х символьного региона
-		add_region< stat_data_index >( best_number, etal, original, sum_first, avarage_height, false, stat_data );
-		add_region< stat_data_index >( best_number, etal, original, sum_second, avarage_height, true, stat_data );
-	}*/
-
 	{
+		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
+		const vector< vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
+		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data );
+		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 1 ), avarage_height, true, stat_data );
+	}
+
+/*	{
  		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
 		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
 		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
@@ -1039,25 +1067,10 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 			}
 		}
 
-		const size_t figs_size = figs.size();
-		pair_int sum_first( 0, 0 );
-		pair_int sum_second( 0, 0 );
-		pair_int sum_thred( 0, 0 );
-		for ( size_t nn = 0; nn < figs_size; ++nn )
-		{
-			sum_first = sum_first + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 0 ].first ), static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 0 ].second ) );
-			sum_second = sum_second + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 1 ].first ), static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 1 ].second ) );
-			sum_thred = sum_thred + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 2 ].first ), static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 2 ].second ) );
-		}
-		sum_first = sum_first / 6;
-		sum_second = sum_second / 6;
-		sum_thred = sum_thred / 6;
-
-		// ищем цифры 3-х символьный регион
-		add_region< stat_data_index >( best_number, etal, original, sum_first, avarage_height, false, stat_data );
-		add_region< stat_data_index >( best_number, etal, original, sum_second, avarage_height, false, stat_data );
-		add_region< stat_data_index >( best_number, etal, original, sum_thred, avarage_height, true, stat_data );
-	}
+		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data );
+		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 1 ), avarage_height, false, stat_data );
+		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 2 ), avarage_height, true, stat_data );
+	}*/
 }
 
 pair< string, int > read_number( const Mat& image, int gray_step )

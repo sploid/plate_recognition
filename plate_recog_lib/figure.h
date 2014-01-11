@@ -95,7 +95,7 @@ public:
 	{
 		return std::make_pair( right(), bottom() );
 	}
-	bool is_valid() const
+	bool is_too_big() const
 	{
 		return !m_too_big && !is_empty();
 	}
