@@ -63,8 +63,6 @@ private:
 
 int process_file_task::m_sum = 0;
 
-#include <Windows.h>
-
 int main( int argc, char** argv )
 {
 	using namespace std;

@@ -21,6 +21,13 @@ public:
 		, m_too_big( false )
 	{
 	}
+	figure( int left, int right, int top, int bottom )
+		: m_left( left )
+		, m_right( right )
+		, m_top( top )
+		, m_bottom( bottom )
+	{
+	}
 	int width() const
 	{
 		return m_right - m_left;

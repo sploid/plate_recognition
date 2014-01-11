@@ -39,6 +39,11 @@ struct found_number
 		}
 	}
 
+	bool is_valid() const
+	{
+		return weight != -1 && !number.empty();
+	}
+
 private:
 	int count_not_parsed_syms() const
 	{
@@ -220,7 +225,16 @@ bool angle_is_equal( int an1, int an2 )
 pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original, number_data& stat_data )
 {
 	const int left = fig.left();
+	if ( left < 0 )
+	{
+		int t = 0;
+	}
+
 	int right = left + fig.width() + 1;
+	if ( right < 0 )
+	{
+		int t = 0;
+	}
 	if ( right >= original.cols )
 	{
 		right = original.cols - 1;
@@ -296,6 +310,10 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 			}
 		}
 		++cur_index;
+	}
+	if ( fig.left() < -1 )
+	{
+		int t = 0;
 	}
 }
 
@@ -580,6 +598,7 @@ struct found_symbol
 
 found_number find_best_number_by_weight( const vector< found_number >& vals, const Mat* etal = 0 )
 {
+	(void)etal;
 	assert( !vals.empty() );
 	if ( vals.empty() )
 		return found_number();
@@ -721,7 +740,7 @@ vector< found_number > search_number( Mat& etal, vector< figure_group >& groups,
 	return ret;
 }
 
-int fine_best_level( const vector< found_number >& found_nums )
+int fine_best_index( const vector< found_number >& found_nums )
 {
 	if ( found_nums.empty() )
 		return -1;
@@ -851,80 +870,87 @@ pair_int search_nearest_black( const Mat& etal, const pair_int& center )
 	}
 }
 
-// void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, bool last_symbol )
-// {
-// 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
-// /*	best_number.figs.push_back( figure( nearest_black, pair_int( 0, 0 ) ) );
-// 	imwrite("C:\\imgs\\debug\\1.png", etal);
-// 	return;*/
-// 
-// 	if ( nearest_black.first != -1
-// 		|| nearest_black.second != -1 )
-// 	{
-// 		figure top_border_fig;
-// 		Mat to_search = etal.clone();
-// 		// Ищем контуры по верхней границе
-// 		add_pixel_as_spy( nearest_black.second, nearest_black.first, to_search, top_border_fig, -1, nearest_black.second + 1 );
-// 		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
-// 		{
-// 			Mat to_contur = etal.clone();
-// 			figure conture_fig;
-// 			add_pixel_as_spy( nearest_black.second, nearest_black.first, to_contur, conture_fig, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
-// 			if ( conture_fig.width() >= static_cast< int >( avarage_height ) ) // если широкая фигура, то скорее всего захватили рамку
-// 			{
-// 				// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
-// 				Mat to_stable = etal.clone();
-// 				figure short_fig;
-// 				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
-// 				add_pixel_as_spy( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
-// 				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
-// 			}
-// 			else if ( last_symbol && conture_fig.width() >= static_cast< int >( avarage_height * 0.80 ) ) // если последняя фигура, то могли захватить болтик черный
-// 			{
-// 				// Тут делаю обработку захвата болтика
-// 				conture_fig = figure( conture_fig.left(), conture_fig.left() + static_cast< int >( avarage_height * 0.60 ), conture_fig.top(), conture_fig.bottom() );
-// 			}
-// 			best_number.figs.push_back( conture_fig );
-// 			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal );
-// 			if ( sym_sym.first != 0 )
-// 			{
-// 				best_number.number += sym_sym.first;
-// 			}
-// 			else
-// 			{
-// 				best_number.number += '?';
-// 			}
-// 		}
-// 		else
-// 		{
-// 
-// 			// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
-// 			Mat to_stable = etal.clone();
-// 			figure short_fig;
-// 			// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
-// 			add_pixel_as_spy( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
-// 			figure conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
-// 
-// 			// кажется нашли рамку
-// 			best_number.figs.push_back( conture_fig );
-// 			const pair< char, double > sym_sym = find_sym( true, conture_fig, etal );
-// 			if ( sym_sym.first != 0 )
-// 			{
-// 				best_number.number += sym_sym.first;
-// 			}
-// 			else
-// 			{
-// 				best_number.number += '?';
-// 			}
-// 		}
-// 	}
-// 	else
-// 	{
-// 		best_number.number += '?';
-// 	}
-// }
+ template< int stat_data_index >
+void add_region( found_number& best_number, const Mat& etal, const Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
+ {
+	const pair_int nearest_black = search_nearest_black( etal, reg_center );
+//	best_number.figs.push_back( figure( nearest_black, pair_int( 0, 0 ) ) );
+//	return;
 
-template< int stat_data_index >
+	if ( nearest_black.first != -1
+		&& nearest_black.second != -1 )
+	{
+		figure top_border_fig;
+		Mat to_search = etal.clone();
+		// Ищем контуры по верхней границе
+		add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_search, top_border_fig, -1, nearest_black.second + 1 );
+		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
+		{
+			Mat to_contur = etal.clone();
+			figure conture_fig;
+			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_contur, conture_fig, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
+			if ( conture_fig.width() >= static_cast< int >( avarage_height ) ) // если широкая фигура, то скорее всего захватили рамку
+			{
+				// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
+				Mat to_stable = etal.clone();
+				figure short_fig;
+				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
+				add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
+				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
+			}
+			else if ( last_symbol && conture_fig.width() >= static_cast< int >( avarage_height * 0.80 ) ) // если последняя фигура, то могли захватить болтик черный
+			{
+				// Тут делаю обработку захвата болтика
+				conture_fig = figure( conture_fig.left(), conture_fig.left() + static_cast< int >( avarage_height * 0.60 ), conture_fig.top(), conture_fig.bottom() );
+			}
+			best_number.figs.push_back( conture_fig );
+			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
+			if ( sym_sym.first != 0 )
+			{
+				best_number.number += sym_sym.first;
+			}
+			else
+			{
+				best_number.number += '?';
+			}
+		}
+		else
+		{
+
+			// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
+			Mat to_stable = etal.clone();
+			figure short_fig;
+			// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
+			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
+			if ( !short_fig.is_empty() )
+			{
+				figure conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
+
+				// кажется нашли рамку
+				best_number.figs.push_back( conture_fig );
+				const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
+				if ( sym_sym.first != 0 )
+				{
+					best_number.number += sym_sym.first;
+				}
+				else
+				{
+					best_number.number += '?';
+				}
+			}
+			else
+			{
+				best_number.number += '?';
+			}
+		}
+	}
+	else
+	{
+		best_number.number += '?';
+	}
+}
+
+/*template< int stat_data_index >
 void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, const Mat& original, number_data& stat_data )
 {
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
@@ -972,10 +998,10 @@ void add_region( found_number& best_number, const Mat& etal, const pair_int& reg
 	{
 		best_number.number += "?";
 	}
-}
+}*/
 
 template< int stat_data_index >
-void search_region( found_number& best_number, const Mat& etal, const Mat& original )
+void search_region( found_number& best_number, const Mat& etal, const Mat& original, number_data& stat_data )
 {
 	const vector< figure >& figs = best_number.figs;
 	if ( figs.size() != 6 ) // ищем регион только если у нас есть все 6 символов
@@ -1040,8 +1066,8 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 		sum_second = sum_second / 6;
 
 		// ищем цифры 2-х символьного региона
-//		add_region( best_number, etal, sum_first, avarage_height, false );
-//		add_region( best_number, etal, sum_second, avarage_height, true );
+		add_region< stat_data_index >( best_number, etal, original, sum_first, avarage_height, false, stat_data );
+		add_region< stat_data_index >( best_number, etal, original, sum_second, avarage_height, true, stat_data );
 	}
 
 // 	int sum_dist = 0;
@@ -1194,7 +1220,7 @@ void remove_single_pixels( Mat& mat )
 }
 
 template< int stat_data_index >
-vector< found_number > read_number_impl( const Mat& input, int gray_level )
+vector< found_number > read_number_impl( const Mat& input, int gray_level, number_data& stat_data )
 {
 	const Mat& gray_image = create_gray_image( input );
 	Mat img_bw = gray_image > gray_level;
@@ -1215,7 +1241,6 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level )
 	// сливаем пересекающиеся группы
 	groups_merge_intersects( groups );
 	// ищем номера
-	number_data stat_data;
 	const vector< found_number > nums = search_number( img_to_rez, groups, gray_image, stat_data );
 	return nums;
 }
@@ -1224,92 +1249,104 @@ pair< string, int > read_number_loop( const Mat& input, const vector< int >& sea
 {
 	pair< string, int > ret( make_pair( string(), 0 ) );
 	const int free_index = get_free_index();
-
-	vector< found_number > found_nums;
-	for ( size_t nn = 0; nn < search_levels.size(); ++nn )
+	try
 	{
-		vector< found_number > cur_nums;
-		switch ( free_index )
+		number_data stat_data;
+		vector< found_number > found_nums;
+		for ( size_t nn = 0; nn < search_levels.size(); ++nn )
 		{
-		case 0:
-			cur_nums = read_number_impl< 0 >( input, search_levels.at( nn ) );
-			break;
-		case 1:
-			cur_nums = read_number_impl< 1 >( input, search_levels.at( nn ) );
-			break;
-		case 2:
-			cur_nums = read_number_impl< 2 >( input, search_levels.at( nn ) );
-			break;
-		case 3:
-			cur_nums = read_number_impl< 3 >( input, search_levels.at( nn ) );
-			break;
-		case 4:
-			cur_nums = read_number_impl< 4 >( input, search_levels.at( nn ) );
-			break;
-		case 5:
-			cur_nums = read_number_impl< 5 >( input, search_levels.at( nn ) );
-			break;
-		case 6:
-			cur_nums = read_number_impl< 6 >( input, search_levels.at( nn ) );
-			break;
-		case 7:
-			cur_nums = read_number_impl< 7 >( input, search_levels.at( nn ) );
-			break;
-		default:
-			throw runtime_error( "invalid data index" );
-		};
-		
-		copy( cur_nums.begin(), cur_nums.end(), back_inserter( found_nums ) );
+			vector< found_number > cur_nums;
+			switch ( free_index )
+			{
+			case 0:
+				cur_nums = read_number_impl< 0 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 1:
+				cur_nums = read_number_impl< 1 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 2:
+				cur_nums = read_number_impl< 2 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 3:
+				cur_nums = read_number_impl< 3 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 4:
+				cur_nums = read_number_impl< 4 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 5:
+				cur_nums = read_number_impl< 5 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 6:
+				cur_nums = read_number_impl< 6 >( input, search_levels.at( nn ), stat_data );
+				break;
+			case 7:
+				cur_nums = read_number_impl< 7 >( input, search_levels.at( nn ), stat_data );
+				break;
+			default:
+				throw runtime_error( "invalid data index" );
+			};
+
+			if ( cur_nums.empty() )
+			{
+				found_nums.push_back( found_number() );
+			}
+			else
+			{
+				found_nums.push_back( cur_nums.at( fine_best_index( cur_nums ) ) );
+			}
+		}
+
+		const int best_index = fine_best_index( found_nums );
+		if ( best_index != -1 )
+		{
+			found_number& best_number = found_nums.at( best_index );
+			const Mat& gray_image = create_gray_image( input );
+			switch ( free_index )
+			{
+			case 0:
+				search_region< 0 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 1:
+				search_region< 1 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 2:
+				search_region< 2 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 3:
+				search_region< 3 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 4:
+				search_region< 4 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 5:
+				search_region< 5 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 6:
+				search_region< 6 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			case 7:
+				search_region< 7 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				break;
+			default:
+				throw runtime_error( "invalid data index" );
+			};
+
+			// рисуем квадрат номера
+			Mat num_rect_image = input.clone();
+			for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
+			{
+				const figure& cur_fig = best_number.figs[ nn ];
+				rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
+			}
+
+			imwrite( next_name( "etal" ), num_rect_image );
+			imwrite( next_name( "binary" ), gray_image > search_levels.at( best_index ) );
+
+			ret = best_number.to_pair();
+		}
 	}
-
-	const int best_level = fine_best_level( found_nums );
-	if ( best_level != -1 )
+	catch ( const cv::Exception& )
 	{
-		assert( best_level != -1 );
-		found_number& best_number = found_nums.at( best_level );
-/*		const Mat& gray_image = create_gray_image( input );
-		switch ( free_index )
-		{
-		case 0:
-			search_region< 0 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 1:
-			search_region< 1 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 2:
-			search_region< 2 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 3:
-			search_region< 3 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 4:
-			search_region< 4 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 5:
-			search_region< 5 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 6:
-			search_region< 6 >( best_number, gray_image > best_level, gray_image );
-			break;
-		case 7:
-			search_region< 7 >( best_number, gray_image > best_level, gray_image );
-			break;
-		default:
-			throw runtime_error( "invalid data index" );
-		};*/
-
-		// рисуем квадрат номера
-/*		Mat num_rect_image = image.clone();
-		for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
-		{
-			const figure& cur_fig = best_number.figs[ nn ];
-			rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
-		}*/
-
-//		imwrite( "C:\\imgs\\debug\\0.png", num_rect_image );
-//		imwrite( "C:\\imgs\\debug\\1.png", gray_image > best_level );
-
-		ret = best_number.to_pair();
 	}
 	set_free_index( free_index );
 	return ret;
