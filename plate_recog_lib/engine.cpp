@@ -225,22 +225,15 @@ bool angle_is_equal( int an1, int an2 )
 pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original, number_data& stat_data )
 {
 	const int left = fig.left();
-	if ( left < 0 )
-	{
-		int t = 0;
-	}
-
+	assert( left >= 0 );
 	int right = left + fig.width() + 1;
-	if ( right < 0 )
-	{
-		int t = 0;
-	}
 	if ( right >= original.cols )
 	{
 		right = original.cols - 1;
 	}
 
 	const int top = fig.top();
+	assert( top >= 0 );
 	int bottom = top + fig.height() + 1;
 	if ( bottom >= original.rows )
 	{
@@ -311,10 +304,7 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 		}
 		++cur_index;
 	}
-	if ( fig.left() < -1 )
-	{
-		int t = 0;
-	}
+	assert( !fig.is_valid() || fig.left() >= 0 );
 }
 
 bool fig_less_left( const figure& lf, const figure& rf )
@@ -903,11 +893,18 @@ void add_region( found_number& best_number, const Mat& etal, const Mat& origin, 
 				// Тут делаю обработку захвата болтика
 				conture_fig = figure( conture_fig.left(), conture_fig.left() + static_cast< int >( avarage_height * 0.60 ), conture_fig.top(), conture_fig.bottom() );
 			}
-			best_number.figs.push_back( conture_fig );
-			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
-			if ( sym_sym.first != 0 )
+			if ( find( best_number.figs.begin(), best_number.figs.end(), conture_fig ) == best_number.figs.end() )
 			{
-				best_number.number += sym_sym.first;
+				best_number.figs.push_back( conture_fig );
+				const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
+				if ( sym_sym.first != 0 )
+				{
+					best_number.number += sym_sym.first;
+				}
+				else
+				{
+					best_number.number += '?';
+				}
 			}
 			else
 			{
@@ -950,56 +947,6 @@ void add_region( found_number& best_number, const Mat& etal, const Mat& origin, 
 	}
 }
 
-/*template< int stat_data_index >
-void add_region( found_number& best_number, const Mat& etal, const pair_int& reg_center, const double avarage_height, const Mat& original, number_data& stat_data )
-{
-	const pair_int nearest_black = search_nearest_black( etal, reg_center );
-	if ( nearest_black.first != -1
-		|| nearest_black.second != -1 )
-	{
-		figure top_border_fig;
-		Mat to_search = etal.clone();
-		// Ищем контуры по нижней границе
-		add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_search, top_border_fig, stat_data, -1, nearest_black.second + 1 );
-		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
-		{
-			Mat to_contur = etal.clone();
-			figure conture_fig;
-			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_contur, conture_fig, stat_data, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
-			// если у нас рамочка наезжает на цифры, то у нас будет очень широкая фигура
-			if ( conture_fig.width() >= static_cast< int >( avarage_height ) )
-			{
-				// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
-				Mat to_stable = etal.clone();
-				figure short_fig;
-				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
-				add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, stat_data, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
-				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.65 ), static_cast< int >( avarage_height ) ) );
-			}
-			best_number.figs.push_back( conture_fig );
-//			const pair< char, double > sym_sym = find_sym_legacy( true, conture_fig, etal );
-			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, original, stat_data );
-			if ( sym_sym.first != 0 )
-			{
-				best_number.number += sym_sym.first;
-			}
-			else
-			{
-				best_number.number += "?";
-			}
-		}
-		else
-		{
-			// не нашли верхней границы
-			best_number.number += "?";
-		}
-	}
-	else
-	{
-		best_number.number += "?";
-	}
-}*/
-
 template< int stat_data_index >
 void search_region( found_number& best_number, const Mat& etal, const Mat& original, number_data& stat_data )
 {
@@ -1030,7 +977,7 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 	avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
 	const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
 
-	{
+/*	{
 		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
 		vector< vector< pair_doub > > move_reg_by_2_sym_reg;
 		fill_reg( move_reg_by_2_sym_reg, 6.7656, -0.4219, 7.5363, -0.3998 );
@@ -1068,101 +1015,49 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 		// ищем цифры 2-х символьного региона
 		add_region< stat_data_index >( best_number, etal, original, sum_first, avarage_height, false, stat_data );
 		add_region< stat_data_index >( best_number, etal, original, sum_second, avarage_height, true, stat_data );
-	}
+	}*/
 
-// 	int sum_dist = 0;
-// 	for ( int nn = 5; nn >= 1; --nn )
-// 	{
-// 		sum_dist += figs.at( nn ).center().first - figs.at( nn - 1 ).center().first;
-// 	}
-// 	// средняя дистанция между символами
-// 	const double avarage_distance = static_cast< double >( sum_dist ) / 5.;
-// 	const double koef_height = 0.76; // отношение высоты буквы к высоте цифры
-// 	// средняя высота буквы
-// 	const double avarage_height = ( static_cast< double >( figs.at( 0 ).height() + figs.at( 4 ).height() + figs.at( 5 ).height() ) / 3.
-// 		+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
-// 	const double div_sym_hei_to_dis = avarage_distance / avarage_height;
-// 	const double koef_move_by_2_sym_reg = 1.06;
-// 	// смещение относительно расстояния между первым и вторым символом
-// 	double koef_by_x = ( ( figs.at( 5 ).center().first - figs.at( 0 ).center().first ) / avarage_height ) / 5.3496;
-// // 	if ( div_sym_hei_to_dis > koef_move_by_2_sym_reg )
-// // 	{
-// // 		// точно 2-х символьный регион и угол наклона 0
-// // 	}
-// // 	else
-// // 	{
-// // 		const double koef_move_by_3_sym_reg = 0.96;
-// // 		// угол наклона номера, если у нас 3-х символьный регион
-// // 		const double angle_3_sym_reg = div_sym_hei_to_dis > koef_move_by_3_sym_reg ? 0. : acos( div_sym_hei_to_dis / koef_move_by_3_sym_reg );
-// // 		const double cos_angle_3_sym_reg = cos( angle_3_sym_reg );
-// 		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
-// 		vector< vector< pair_doub > > move_reg_by_2_sym_reg;
-// 		fill_reg( move_reg_by_2_sym_reg, 6.7656, -0.4219, 7.5363, -0.3998 );
-// 		fill_reg( move_reg_by_2_sym_reg, 5.6061, -0.2560, 6.3767, -0.2338 );
-// 		fill_reg( move_reg_by_2_sym_reg, 4.6016, -0.2991, 5.3721, -0.2769 );
-// 		fill_reg( move_reg_by_2_sym_reg, 3.5733, -0.3102, 4.3440, -0.2880 );
-// 		fill_reg( move_reg_by_2_sym_reg, 2.4332, -0.4802, 3.2039, -0.4580 );
-// 		fill_reg( move_reg_by_2_sym_reg, 1.4064, -0.5123, 2.1770, -0.4901 );
-// 
-// // 		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
-// // 		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
-// // 		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
-// // 		fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
-// // 		fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
-// // 		fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
-// // 		fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
-// // 		fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
-// 
-// 		// ищем угол наклона по высоте (считаем среднее между не соседними фигурами 0-4, 0-5, 1-3)
-// 		vector< pair_int > index_fig_to_angle;
-// 		index_fig_to_angle.push_back( make_pair( 0, 4 ) );
-// 		index_fig_to_angle.push_back( make_pair( 0, 5 ) );
-// 		index_fig_to_angle.push_back( make_pair( 1, 3 ) );
-// 		double avarage_angle_by_y = 0.; // средний угол наклона номера по оси У
-// 		int move_by_y = 0; // номер наклонен вверх или вниз
-// 		for ( size_t nn = 0; nn < index_fig_to_angle.size(); ++nn )
-// 		{
-// 			const pair_int& cur_in = index_fig_to_angle.at( nn );
-// 			avarage_angle_by_y += atan( static_cast< double >( figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second ) / static_cast< double >( figs[ cur_in.first ].center().first - figs[ cur_in.second ].center().first ) );
-// 			move_by_y += figs[ cur_in.first ].center().second - figs[ cur_in.second ].center().second;
-// 		}
-// 		avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
-// 		const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
-// 
-// 		// перемножаем все коэффициенты что бы получить реальное значение смещения в пикселях
-// 		for ( size_t nn = 0; nn < move_reg_by_2_sym_reg.size(); ++nn )
-// 		{
-// 			for ( size_t mm = 0; mm < move_reg_by_2_sym_reg[ nn ].size(); ++mm )
-// 			{
-// 				move_reg_by_2_sym_reg[ nn ][ mm ].first = move_reg_by_2_sym_reg[ nn ][ mm ].first * avarage_height * koef_by_x;
-// 				const double angle_offset = sin_avarage_angle_by_y * move_reg_by_2_sym_reg[ nn ][ mm ].first;
-// 				move_reg_by_2_sym_reg[ nn ][ mm ].second = move_reg_by_2_sym_reg[ nn ][ mm ].second * avarage_height + angle_offset;
-// 			}
-// 		}
-// // 		for ( size_t nn = 0; nn < move_reg_by_3_sym_reg.size(); ++nn )
-// // 		{
-// // 			for ( size_t mm = 0; mm < move_reg_by_3_sym_reg[ nn ].size(); ++mm )
-// // 			{
-// // 				move_reg_by_3_sym_reg[ nn ][ mm ] = move_reg_by_3_sym_reg[ nn ][ mm ] * avarage_height * cos_angle_3_sym_reg;
-// // 			}
-// // 		}
-// 
-// 		// рисуем позиции 2-х символьного региона
-// 		const size_t figs_size = figs.size();
-// 		pair_int sum_first( 0, 0 );
-// 		pair_int sum_second( 0, 0 );
-// 		for ( size_t nn = 0; nn < figs_size; ++nn )
-// 		{
-// 			sum_first = sum_first + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 0 ].first ), static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 0 ].second ) );
-// 			sum_second = sum_second + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 1 ].first ), static_cast< int >( move_reg_by_2_sym_reg[ nn ][ 1 ].second ) );
-// 		}
-// 		sum_first = sum_first / 6;
-// 		sum_second = sum_second / 6;
-// 
-// 		// ищем цифры 2-х символьного региона
-// //		add_region( best_number, etal, sum_first, avarage_height, original );
-// //		add_region( best_number, etal, sum_second, avarage_height, original );
-// //	}
+	{
+ 		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
+		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
+		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
+		fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
+		fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
+		fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
+		fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
+		fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
+
+		const double diff_by_x_3_sym = move_reg_by_3_sym_reg[ 0 ][ 0 ].first - move_reg_by_3_sym_reg[ move_reg_by_3_sym_reg.size() - 1 ][ 0 ].first;
+		const double koef_by_x_3_sym = ( ( figs.at( figs.size() - 1 ).center().first - figs.at( 0 ).center().first ) / avarage_height ) / diff_by_x_3_sym;
+		for ( size_t nn = 0; nn < move_reg_by_3_sym_reg.size(); ++nn )
+		{
+			for ( size_t mm = 0; mm < move_reg_by_3_sym_reg[ nn ].size(); ++mm )
+			{
+				move_reg_by_3_sym_reg[ nn ][ mm ].first = move_reg_by_3_sym_reg[ nn ][ mm ].first * avarage_height * koef_by_x_3_sym;
+				const double angle_offset = sin_avarage_angle_by_y * move_reg_by_3_sym_reg[ nn ][ mm ].first;
+				move_reg_by_3_sym_reg[ nn ][ mm ].second = move_reg_by_3_sym_reg[ nn ][ mm ].second * avarage_height + angle_offset;
+			}
+		}
+
+		const size_t figs_size = figs.size();
+		pair_int sum_first( 0, 0 );
+		pair_int sum_second( 0, 0 );
+		pair_int sum_thred( 0, 0 );
+		for ( size_t nn = 0; nn < figs_size; ++nn )
+		{
+			sum_first = sum_first + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 0 ].first ), static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 0 ].second ) );
+			sum_second = sum_second + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 1 ].first ), static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 1 ].second ) );
+			sum_thred = sum_thred + figs.at( nn ).center() + pair_int( static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 2 ].first ), static_cast< int >( move_reg_by_3_sym_reg[ nn ][ 2 ].second ) );
+		}
+		sum_first = sum_first / 6;
+		sum_second = sum_second / 6;
+		sum_thred = sum_thred / 6;
+
+		// ищем цифры 3-х символьный регион
+		add_region< stat_data_index >( best_number, etal, original, sum_first, avarage_height, false, stat_data );
+		add_region< stat_data_index >( best_number, etal, original, sum_second, avarage_height, false, stat_data );
+		add_region< stat_data_index >( best_number, etal, original, sum_thred, avarage_height, true, stat_data );
+	}
 }
 
 pair< string, int > read_number( const Mat& image, int gray_step )
