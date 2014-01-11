@@ -6,57 +6,38 @@
 #pragma warning( pop )
 #include <QCoreApplication>
 
+#include "sym_recog.h"
+
 using namespace std;
 using namespace cv;
 
-const int max_hidden_neuron = 500;
-const int data_width = 15;
-const int data_height = 22;
+const int max_hidden_neuron = 25;
 
-vector< pair< char, Mat > > train_data( const std::string& image_folder )
+vector< pair< char, Mat > > train_data( bool num )
 {
+	const string image_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../train_data" ).toLocal8Bit() );
+
 	vector< pair< char, Mat > > ret;
 	QDir image_dir( image_folder.c_str() );
 	if ( image_dir.exists() )
 	{
-		const QStringList all_files = image_dir.entryList( QStringList() << "*.png" );
+		QStringList filters;
+		if ( num )
+		{
+			filters << "0*.png" << "1*.png" << "2*.png" << "3*.png" << "4*.png" << "5*.png" << "6*.png" << "7*.png" << "8*.png" << "9*.png";
+		}
+		else
+		{
+			filters << "A*.png" << "B*.png" << "C*.png" << "E*.png" << "H*.png" << "K*.png" << "M*.png" << "O*.png" << "P*.png" << "T*.png" << "X*.png" << "Y*.png";
+		}
+		const QStringList all_files = image_dir.entryList( filters );
 		for ( int nn = 0; nn < all_files.size(); ++nn )
 		{
 			const QString& next_file_name = all_files.at( nn );
-			Mat next_mat( imread( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() ) );
-			Mat one_chan_gray;
-			if ( next_mat.channels() == 3 && next_mat.depth() == CV_MAT_DEPTH( CV_8U ) )
-			{
-				Mat gray( next_mat.size(), CV_8U );
-				cvtColor( next_mat, one_chan_gray, CV_RGB2GRAY );
-			}
-			else if ( next_mat.channels() == 1 && next_mat.depth() == CV_MAT_DEPTH( CV_8U ) )
-			{
-				one_chan_gray = next_mat;
-			}
-
+			const Mat one_chan_gray = from_file_to_row( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() );
 			if ( !one_chan_gray.empty() )
 			{
-				Mat gray_sized( data_height, data_width, CV_8U );
-				cv::resize(one_chan_gray, gray_sized, gray_sized.size() );
-				Mat gray_float( data_height, data_width, CV_32F );
-				gray_sized.convertTo( gray_float, CV_32F );
-				switch ( next_file_name.toLocal8Bit().data()[ 0 ] )
-				{
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-				case '8':
-				case '9':
-					ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], gray_float ) );
-				default:
-					break;
-				}
+				ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], one_chan_gray ) );
 			}
 			else
 			{
@@ -67,64 +48,82 @@ vector< pair< char, Mat > > train_data( const std::string& image_folder )
 	return ret;
 }
 
-string path_to_save_train( const string& module_path )
+string path_to_save_train( bool num )
 {
-	QString q_mod_path( QDir::fromNativeSeparators( QString::fromLocal8Bit( module_path.c_str() ) ) );
-	int index_separator = q_mod_path.lastIndexOf( "/" );
-	if ( index_separator != -1 )
-	{
-		q_mod_path.remove( index_separator, q_mod_path.size() - index_separator );
-	}
-	else
-	{
-		q_mod_path.clear();
-	}
-	return string( ( q_mod_path + "/neural_net.yml" ).toLocal8Bit().data() );
+	const string nn_config_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../other" ).toLocal8Bit() );
+	return num ? nn_config_folder + "\\neural_net_num.yml" : nn_config_folder + "\\neural_net_char.yml";
 }
 
-void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row )
+void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row, bool num )
 {
-	input = Mat( t_data.size(), els_in_row, CV_32F );
-	output = Mat( t_data.size(), 10, CV_32F );
+	const int count_ret = num ? 10 : 12;
+	input = Mat( 0, els_in_row, CV_32F );
+	output = Mat( t_data.size(), count_ret, CV_32F );
 	for ( size_t nn = 0; nn < t_data.size(); ++nn )
 	{
-		for ( int mm = 0; mm < t_data.at( nn ).second.rows; ++mm )
-		{
-			for ( int kk = 0; kk < t_data.at( nn ).second.cols; ++kk )
-			{
-				const int cur_el = mm * t_data.at( nn ).second.cols + kk;
-				input.at< float >( nn, cur_el ) = t_data.at( nn ).second.at< float >( mm, kk );
-			}
-		}
-		for ( int mm = 0; mm < 10; ++mm )
+		input.push_back( t_data.at( nn ).second );
+		for ( int mm = 0; mm < count_ret; ++mm )
 		{
 			output.at< float >( nn, mm ) = 0.;
 		}
-		assert( t_data.at( nn ).first >= 48 && t_data.at( nn ).first <= 57 );
-		output.at< float >( nn, t_data.at( nn ).first - 48 ) = 1.;
-	}
-}
-
-int search_max_val( const Mat& data, int row )
-{
-	int max_col = 0;
-	float max_val = data.at< float >( row, 0 );
-	for ( int nn = 1; nn < data.cols; ++nn )
-	{
-		if ( data.at< float >( row, nn ) > max_val )
+		int el_index = 0;
+		if ( num )
 		{
-			max_col = nn;
-			max_val = data.at< float >( row, nn );
+			el_index = t_data.at( nn ).first - 48;
 		}
+		else
+		{
+			switch (t_data.at( nn ).first)
+			{
+			default:
+				assert( !"there should be no such char" );
+			case 'A':
+				el_index = 0;
+				break;
+			case 'B':
+				el_index = 1;
+				break;
+			case 'C':
+				el_index = 2;
+				break;
+			case 'E':
+				el_index = 3;
+				break;
+			case 'H':
+				el_index = 4;
+				break;
+			case 'K':
+				el_index = 5;
+				break;
+			case 'M':
+				el_index = 6;
+				break;
+			case 'O':
+				el_index = 7;
+				break;
+			case 'P':
+				el_index = 8;
+				break;
+			case 'T':
+				el_index = 9;
+				break;
+			case 'X':
+				el_index = 10;
+				break;
+			case 'Y':
+				el_index = 11;
+				break;
+			}
+		}
+		output.at< float >( nn, el_index ) = 1.;
 	}
-	return max_col;
 }
 
 float evaluate( const Mat& output, int output_row, const Mat& pred_out )
 {
 	// проверяем правильный ли ответ
-	if ( search_max_val( output, output_row ) != search_max_val( pred_out, 0 ) )
-		return -1;
+	if ( search_max_val( output, output_row ) != search_max_val( pred_out ) )
+		return -100.;
 
 	// находим смещение
 	float ret = 0.;
@@ -151,39 +150,31 @@ void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_ind
 	}
 }
 
-int main( int argc, char** argv )
+void make_training( bool num )
 {
-	if ( argc <= 1 )
-	{
-		cout << "usage: auto_test_desktop image_folder";
-		return 1;
-	}
-
-	// ищем оптимальное количество нейронов и уровней в невидимом слое
-	const string image_folder( argv[ 1 ] );
 	const int max_hidden_levels = 1;
-	const vector< pair< char, Mat > > t_data = train_data( image_folder );
+	const vector< pair< char, Mat > > t_data = train_data( num );
 	if ( t_data.empty() )
 	{
 		cout << "input files not found";
-		return 1;
+		return;
 	}
 	Mat input, output;
-	parse_to_input_output_data( t_data, input, output, data_width * data_height );
+	parse_to_input_output_data( t_data, input, output, data_width * data_height, num );
 	Mat weights( 1, t_data.size(), CV_32FC1, Scalar::all( 1 ) );
 
 	// формируем конфигурации сети
 	vector< Mat > configs;
 	Mat first_size( 1, 2, CV_32SC1 );
 	first_size.at< int >( 0 ) = data_width * data_height;
-	first_size.at< int >( 1 ) = 10; // 10 цифр
+	first_size.at< int >( 1 ) = num ? 10 : 12; // 10 цифр, 12 букв
 	configs.push_back( first_size );
 	for ( int nn = 1; nn <= max_hidden_levels; ++nn )
 	{
 		const int all_levels_count = 2 + nn;
 		Mat l_size( 1, all_levels_count, CV_32SC1 );
 		l_size.at< int >( 0 ) = data_width * data_height;
-		l_size.at< int >( all_levels_count - 1 ) = 10; // 10 цифр
+		l_size.at< int >( all_levels_count - 1 ) = num ? 10 : 12; // 10 цифр, 12 букв
 
 		fill_hidden_layers( configs, l_size, 0, nn );
 	}
@@ -198,19 +189,15 @@ int main( int argc, char** argv )
 		float diff_summ = 0.;
 		try
 		{
+			theRNG().state = 0x111111;
 			CvANN_MLP mlp( configs.at( cc ) );
 			mlp.train( input, output, weights );
-			Mat test_sample( 1, data_width * data_height, CV_32FC1 );
 			for ( size_t ll = 0; ll < t_data.size(); ++ll )
 			{
-				for ( int yy = 0; yy < data_width * data_height; ++yy )
-				{
-					test_sample.at< float >( 0, yy ) = input.at< float >( ll, yy );
-				}
 				Mat pred_out;
-				mlp.predict( test_sample, pred_out );
+				mlp.predict( input.row( ll ), pred_out );
 				const float diff = evaluate( output, ll, pred_out );
-				if ( diff >= -0.5 )
+				if ( diff >= -50. )
 				{
 					diff_summ += diff;
 				}
@@ -231,10 +218,18 @@ int main( int argc, char** argv )
 			best_diff = diff_summ;
 		}
 	}
-	cout << configs.at( best_index );
+	cout << configs.at( best_index ) << endl;
 	// сохраняем наилучший результат в файл
+	theRNG().state = 0x111111;
 	CvANN_MLP mlp( configs.at( best_index ) );
 	mlp.train( input, output, weights );
-	FileStorage fs( path_to_save_train( argv[ 0 ] ), cv::FileStorage::WRITE );
+	FileStorage fs( path_to_save_train( num ), cv::FileStorage::WRITE );
 	mlp.write( *fs, "mlp" );
+}
+
+int main( int argc, char** argv )
+{
+	QCoreApplication a( argc, argv );
+	make_training( false );
+	make_training( true );
 }

@@ -1,5 +1,0 @@
-add_library(plate_recog_lib SHARED engine.h engine.cpp syms.h syms.cpp plate_recog_lib_config.h)
-include_directories(${OpenCV_INCLUDE_DIRS})
-target_link_libraries(plate_recog_lib ${OpenCV_LIBS})
-add_definitions(-DPLATE_RECOG_LIB)
-include(../increase_warn_level.cmake)

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 
 std::vector< std::vector< float > > std_sym0();
@@ -10,6 +12,7 @@ std::vector< std::vector< float > > std_sym6();
 std::vector< std::vector< float > > std_sym7();
 std::vector< std::vector< float > > std_sym8();
 std::vector< std::vector< float > > std_sym9();
+
 std::vector< std::vector< float > > std_symA();
 std::vector< std::vector< float > > std_symB();
 std::vector< std::vector< float > > std_symC();
