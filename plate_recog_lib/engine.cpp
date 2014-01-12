@@ -304,7 +304,7 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 		}
 		++cur_index;
 	}
-	assert( !fig.is_valid() || fig.left() >= 0 );
+	assert( fig.is_empty() || fig.left() >= 0 );
 }
 
 bool fig_less_left( const figure& lf, const figure& rf )
@@ -921,12 +921,12 @@ sym_info search_region_symbol( const found_number& best_number, const Mat& etal,
 				}
 				else
 				{
-					best_number.number += '?';
+					ret.m_symbol = '?';
 				}
 			}
 			else
 			{
-				best_number.number += '?';
+				ret.m_symbol = '?';
 			}
 		}
 		else
@@ -942,26 +942,27 @@ sym_info search_region_symbol( const found_number& best_number, const Mat& etal,
 				figure conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
 
 				// кажется нашли рамку
-				best_number.figs.push_back( conture_fig );
+				ret.m_fig = conture_fig;
 				const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
 				if ( sym_sym.first != 0 )
 				{
-					best_number.number += sym_sym.first;
+					ret.m_symbol = sym_sym.first;
+					ret.m_weight = sym_sym.second;
 				}
 				else
 				{
-					best_number.number += '?';
+					ret.m_symbol = '?';
 				}
 			}
 			else
 			{
-				best_number.number += '?';
+				ret.m_symbol = '?';
 			}
 		}
 	}
 	else
 	{
-		best_number.number += '?';
+		ret.m_symbol = '?';
 	}
 	return ret;
 }
@@ -1008,6 +1009,24 @@ vector< vector< pair_doub > > get_2_sym_reg_koef( const vector< figure >& figs, 
 	return ret;
 }
 
+vector< vector< pair_doub > > get_3_sym_reg_koef( const vector< figure >& figs, double avarage_height, double sin_avarage_angle_by_y )
+{
+	vector< vector< pair_doub > > ret;
+	fill_reg( ret, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
+	fill_reg( ret, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
+	fill_reg( ret, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
+	fill_reg( ret, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
+	fill_reg( ret, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
+	fill_reg( ret, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
+	apply_angle( figs, ret, avarage_height, sin_avarage_angle_by_y );
+	return ret;
+}
+
+void func( vector< vector< pair_doub > > (*koef_getter)( const vector< figure >&, double, double ), const vector< figure >& figs, double avarage_height, double sin_avarage_angle_by_y )
+{
+	koef_getter( figs, avarage_height, sin_avarage_angle_by_y );
+}
+
 template< int stat_data_index >
 void search_region( found_number& best_number, const Mat& etal, const Mat& original, number_data& stat_data )
 {
@@ -1038,11 +1057,22 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 	avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
 	const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
 
-	{
-		// коэффициенты смещения символов региона из 2-х букв относительно остальных символов номера
+	vector< sym_info > fs;
+/*	{
 		const vector< vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
-		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data );
-		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 1 ), avarage_height, true, stat_data );
+		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data ) );
+		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 1 ), avarage_height, true, stat_data ) );
+	}*/
+	{
+		const vector< vector< pair_doub > > move_reg_by_3_sym_reg( get_3_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
+		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data ) );
+		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 1 ), avarage_height, false, stat_data ) );
+		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 2 ), avarage_height, true, stat_data ) );
+	}
+
+	for ( size_t nn = 0; nn < fs.size(); ++nn )
+	{
+		best_number.number += fs.at( nn ).m_symbol;
 	}
 
 /*	{
