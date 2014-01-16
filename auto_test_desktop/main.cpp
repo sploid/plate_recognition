@@ -32,7 +32,8 @@ private:
 	{
 		using namespace std;
 		stringstream to_out;
-		to_out << m_file_name.substr( m_folder_name.size() + 1, m_file_name.size() - m_folder_name.size() - 5 ) << "   ";
+		const string file_number( m_file_name.substr( m_folder_name.size() + 1, m_file_name.size() - m_folder_name.size() - 5 ) );
+		to_out << file_number << "   ";
 		const cv::Mat image = cv::imread( m_file_name.c_str(), CV_LOAD_IMAGE_COLOR );   // Read the file
 		int sum = 0;
 		if( image.data )
@@ -40,7 +41,7 @@ private:
 			const int64 begin = cv::getTickCount();
 			const pair< string, int > number = read_number( image, 10 );
 			to_out << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency());
-			if ( m_file_name.find( number.first ) == string::npos )
+			if ( file_number != number.first )
 			{
 				to_out << "  !!  ";
 			}
@@ -76,7 +77,7 @@ int main( int argc, char** argv )
 
 	const string nn_config_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../other" ).toLocal8Bit() );
 
-	read_nn_config( nn_config_folder + "\\neural_net_num.yml", nn_config_folder + "\\neural_net_char.yml" );
+	init_recognizer( nn_config_folder + "\\neural_net_num.yml", nn_config_folder + "\\neural_net_char.yml" );
 
 	const int64 begin = cv::getTickCount();
 	const string image_folder( argv[ 1 ] );

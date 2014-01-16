@@ -10,6 +10,8 @@ using namespace std;
 namespace { namespace aux {
 	NeuralNet_MLP mlp_char;
 	NeuralNet_MLP mlp_num;
+	static set< string > g_region_codes;
+
 } }
 
 int search_max_val( const cv::Mat& data, int row )
@@ -37,6 +39,7 @@ cv::Mat convert_to_row( const cv::Mat& input )
 	}
 	else if ( input.channels() == 1 && input.depth() == CV_MAT_DEPTH( CV_8U ) )
 	{
+//		one_chan_gray = input.clone();
 		one_chan_gray = input;
 	}
 	else
@@ -46,9 +49,9 @@ cv::Mat convert_to_row( const cv::Mat& input )
 
 	if ( !one_chan_gray.empty() )
 	{
-		// ����������
+		// сглаживаем
 		boxFilter( one_chan_gray, one_chan_gray, -1, Size( 3, 3 ) );
-		// ����������� �� �����
+		// растягиваем по цвету
 		equalizeHist( one_chan_gray, one_chan_gray );
 		Mat gray_float( one_chan_gray.size(), CV_32F );
 		one_chan_gray.convertTo( gray_float, CV_32F );
@@ -173,7 +176,7 @@ std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& ml
 	mlp.predict( convert_to_row( input ), pred_out );
 	const int max_val = search_max_val( pred_out );
 	const pair< char, double > ret = make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
-	if ( ret.first == 'A' )
+	if ( ret.first >= '7' && ret.first <= '7' )
 	{
 //		imwrite( next_name( string( "sym" ) + ret.first ), input );
 	}
@@ -212,9 +215,136 @@ void init_nn( NeuralNet_MLP& mlp, const std::string& file_name )
 	}
 }
 
-void read_nn_config( const std::string& num_file_name, const std::string& char_file_name )
+void init_recognizer( const std::string& num_file_name, const std::string& char_file_name )
 {
 	init_nn( aux::mlp_char, char_file_name );
 	init_nn( aux::mlp_num, num_file_name );
+	aux::g_region_codes.insert( "178" ); // ХЗ
+	aux::g_region_codes.insert( "01" ); // Республика Адыгея
+	aux::g_region_codes.insert( "02" );
+	aux::g_region_codes.insert( "102" ); // Республика Башкортостан
+	aux::g_region_codes.insert( "03" ); // Республика Бурятия
+	aux::g_region_codes.insert( "04" ); // Республика Алтай (Горный Алтай)
+	aux::g_region_codes.insert( "05" ); // Республика Дагестан
+	aux::g_region_codes.insert( "06" ); // Республика Ингушетия
+	aux::g_region_codes.insert( "07" ); // Кабардино-Балкарская Республика
+	aux::g_region_codes.insert( "08" ); // Республика Калмыкия
+	aux::g_region_codes.insert( "09" ); // Республика Карачаево-Черкессия
+	aux::g_region_codes.insert( "10" ); // Республика Карелия
+	aux::g_region_codes.insert( "11" ); // Республика Коми
+	aux::g_region_codes.insert( "12" ); // Республика Марий Эл
+	aux::g_region_codes.insert( "13" );
+	aux::g_region_codes.insert( "113" ); // Республика Мордовия
+	aux::g_region_codes.insert( "14" ); // Республика Саха (Якутия)
+	aux::g_region_codes.insert( "15" ); // Республика Северная Осетия-Алания
+	aux::g_region_codes.insert( "16" );
+	aux::g_region_codes.insert( "116" ); // Республика Татарстан
+	aux::g_region_codes.insert( "17" ); // Республика Тыва
+	aux::g_region_codes.insert( "18" ); // Удмуртская Республика
+	aux::g_region_codes.insert( "19" ); // Республика Хакасия
+	aux::g_region_codes.insert( "20" ); // утилизировано (бывшая Чечня)
+	aux::g_region_codes.insert( "21" );
+	aux::g_region_codes.insert( "121" ); // Чувашская Республика
+	aux::g_region_codes.insert( "22" ); // Алтайский край
+	aux::g_region_codes.insert( "23" );
+	aux::g_region_codes.insert( "93" ); // Краснодарский край
+	aux::g_region_codes.insert( "24" ); 
+	aux::g_region_codes.insert( "84" ); 
+	aux::g_region_codes.insert( "88" );
+	aux::g_region_codes.insert( "124" ); // Красноярский край
+	aux::g_region_codes.insert( "25" );
+	aux::g_region_codes.insert( "125" ); // Приморский край
+	aux::g_region_codes.insert( "26" ); // Ставропольский край
+	aux::g_region_codes.insert( "27" ); // Хабаровский край
+	aux::g_region_codes.insert( "28" ); // Амурская область
+	aux::g_region_codes.insert( "29" ); // Архангельская область
+	aux::g_region_codes.insert( "30" ); // Астраханская область
+	aux::g_region_codes.insert( "31" ); // Белгородская область
+	aux::g_region_codes.insert( "32" ); // Брянская область
+	aux::g_region_codes.insert( "33" ); // Владимирская область
+	aux::g_region_codes.insert( "34" ); // Волгоградская область
+	aux::g_region_codes.insert( "35" ); // Вологодская область
+	aux::g_region_codes.insert( "36" ); // Воронежская область
+	aux::g_region_codes.insert( "37" ); // Ивановская область
+	aux::g_region_codes.insert( "38" );
+	aux::g_region_codes.insert( "85" );
+	aux::g_region_codes.insert( "138" ); // Иркутская область
+	aux::g_region_codes.insert( "39" );
+	aux::g_region_codes.insert( "91" ); // Калининградская область
+	aux::g_region_codes.insert( "40" ); // Калужская область
+	aux::g_region_codes.insert( "41" );
+	aux::g_region_codes.insert( "82" ); // Камчатский край
+	aux::g_region_codes.insert( "42" ); // Кемеровская область
+	aux::g_region_codes.insert( "43" ); // Кировская область
+	aux::g_region_codes.insert( "44" ); // Костромская область
+	aux::g_region_codes.insert( "45" ); // Курганская область
+	aux::g_region_codes.insert( "46" ); // Курская область
+	aux::g_region_codes.insert( "47" ); // Ленинградская область
+	aux::g_region_codes.insert( "48" ); // Липецкая область
+	aux::g_region_codes.insert( "49" ); // Магаданская область
+	aux::g_region_codes.insert( "50" );
+	aux::g_region_codes.insert( "90" );
+	aux::g_region_codes.insert( "150" );
+	aux::g_region_codes.insert( "190" ); // Московская область
+	aux::g_region_codes.insert( "51" ); // Мурманская область
+	aux::g_region_codes.insert( "52" );
+	aux::g_region_codes.insert( "152" ); // Нижегородская область
+	aux::g_region_codes.insert( "53" ); // Новгородская область
+	aux::g_region_codes.insert( "54" );
+	aux::g_region_codes.insert( "154" ); // Новосибирская область
+	aux::g_region_codes.insert( "55" ); // Омская область
+	aux::g_region_codes.insert( "56" ); // Оренбургская область
+	aux::g_region_codes.insert( "57" ); // Орловская область
+	aux::g_region_codes.insert( "58" ); // Пензенская область
+	aux::g_region_codes.insert( "59" );
+	aux::g_region_codes.insert( "81" );
+	aux::g_region_codes.insert( "159" ); // Пермский край
+	aux::g_region_codes.insert( "60" ); // Псковская область
+	aux::g_region_codes.insert( "61" );
+	aux::g_region_codes.insert( "161" ); // Ростовская область
+	aux::g_region_codes.insert( "62" ); // Рязанская область
+	aux::g_region_codes.insert( "63" );
+	aux::g_region_codes.insert( "163" ); // Самарская область
+	aux::g_region_codes.insert( "64" );
+	aux::g_region_codes.insert( "164" ); // Саратовская область
+	aux::g_region_codes.insert( "65" ); // Сахалинская область
+	aux::g_region_codes.insert( "66" );
+	aux::g_region_codes.insert( "96" ); // Свердловская область
+	aux::g_region_codes.insert( "67" ); // Смоленская область
+	aux::g_region_codes.insert( "68" ); // Тамбовская область
+	aux::g_region_codes.insert( "69" ); // Тверская область
+	aux::g_region_codes.insert( "70" ); // Томская область
+	aux::g_region_codes.insert( "71" ); // Тульская область
+	aux::g_region_codes.insert( "72" ); // Тюменская область
+	aux::g_region_codes.insert( "73" );
+	aux::g_region_codes.insert( "173" ); // Ульяновская область
+	aux::g_region_codes.insert( "74" );
+	aux::g_region_codes.insert( "174" ); // Челябинская область
+	aux::g_region_codes.insert( "75" );
+	aux::g_region_codes.insert( "80" ); // Забайкальский край
+	aux::g_region_codes.insert( "76" ); // Ярославская область
+	aux::g_region_codes.insert( "77" );
+	aux::g_region_codes.insert( "97" );
+	aux::g_region_codes.insert( "99" );
+	aux::g_region_codes.insert( "177" );
+	aux::g_region_codes.insert( "199" );
+	aux::g_region_codes.insert( "197" ); // г. Москва
+	aux::g_region_codes.insert( "78" );
+	aux::g_region_codes.insert( "98" );
+	aux::g_region_codes.insert( "198" ); // г. Санкт-Петербург
+	aux::g_region_codes.insert( "79" ); // Еврейская автономная область
+	aux::g_region_codes.insert( "83" ); // Ненецкий автономный округ
+	aux::g_region_codes.insert( "86" ); // Ханты-Мансийский автономный округ - Югр
+	aux::g_region_codes.insert( "87" ); // Чукотский автономный округ
+	aux::g_region_codes.insert( "89" ); // Ямало-Ненецкий автономный округ
+	aux::g_region_codes.insert( "92" ); // Резерв МВД Российской Федерации
+	aux::g_region_codes.insert( "94" ); // Территории, которые находятся вне РФ и
+	aux::g_region_codes.insert( "95" ); // Чеченская республика
 }
+
+const std::set< std::string >& region_codes()
+{
+	return aux::g_region_codes;
+}
+
 

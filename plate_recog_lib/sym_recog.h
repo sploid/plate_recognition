@@ -1,6 +1,7 @@
 #pragma once
 #include "plate_recog_lib_config.h"
 #include <string>
+#include <set>
 
 namespace cv
 {
@@ -21,4 +22,6 @@ std::pair< char, double > PLATE_RECOG_EXPORT proc_char( const cv::Mat& input );
 // recognize number
 std::pair< char, double > PLATE_RECOG_EXPORT proc_num( const cv::Mat& input );
 // read configuration of neural networks
-void PLATE_RECOG_EXPORT read_nn_config( const std::string& num_file_name, const std::string& char_file_name );
+void PLATE_RECOG_EXPORT init_recognizer( const std::string& num_file_name, const std::string& char_file_name );
+// region codes
+const std::set< std::string >& region_codes();

@@ -9,22 +9,24 @@
 using namespace cv;
 using namespace std;
 
+
 // найденный номер
 struct found_number
 {
 	found_number()
-		: number( string() )
-		, weight( -1 )
+		: m_number( string() )
+		, m_weight( -1 )
 	{
 	}
-	string number;		// номер
-	int weight;			// вес
-	vector< figure > figs;
+	string m_number;		// номер
+	int m_weight;			// вес
+	vector< figure > m_figs;
 
 	pair< string, int > to_pair() const
 	{
-		return make_pair( number, weight );
+		return make_pair( m_number, m_weight );
 	}
+
 	bool operator < ( const found_number& other ) const
 	{
 		const int cnp = count_not_parsed_syms();
@@ -35,21 +37,20 @@ struct found_number
 		}
 		else
 		{
-			return weight < other.weight;
+			return m_weight < other.m_weight;
 		}
 	}
 
 	bool is_valid() const
 	{
-		return weight != -1 && !number.empty();
+		return m_weight != -1 && !m_number.empty();
 	}
 
-private:
 	int count_not_parsed_syms() const
 	{
-		if ( number.empty() )
+		if ( m_number.empty() )
 			return 100; // вообще ничего нет
-		return count( number.begin(), number.end(), '?' );
+		return count( m_number.begin(), m_number.end(), '?' );
 	}
 };
 
@@ -254,7 +255,7 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 		return it->second;
 	}
 
-	Mat mm( original, sym_border );
+	Mat mm( original.clone(), sym_border );
 	pair< char, double >  ret = num ? proc_num( mm ) : proc_char( mm );
 	stat_data.m_cache_rets[ make_pair( sym_border, num ) ] = ret;
 	return ret;
@@ -621,7 +622,6 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 {
 	assert( pis.size() == 6 );
 	found_number ret;
-	double weight = 0.; // суммарный вес номера
 	for ( size_t oo = 0; oo < pis.size(); ++oo )
 	{
 		bool found = false;
@@ -630,19 +630,18 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 			if ( oo == static_cast< size_t >( figs_by_pos[ kk ].pos_in_pis_index ) )
 			{
 				const found_symbol & cur_sym = figs_by_pos[ kk ];
-				ret.number += cur_sym.symbol;
-				weight += cur_sym.weight;
-				ret.figs.push_back( cur_sym.fig );
+				ret.m_number += cur_sym.symbol;
+				ret.m_weight += static_cast< int >( cur_sym.weight );
+				ret.m_figs.push_back( cur_sym.fig );
 				found = true;
 				break;
 			}
 		}
 		if ( found == false )
 		{
-			ret.number += "?";
+			ret.m_number += "?";
 		}
 	}
-	ret.weight = static_cast< int >( weight );
 	return ret;
 }
 
@@ -871,30 +870,34 @@ struct sym_info
 	{
 		return m_symbol != '?' && m_fig.is_empty();
 	}
+	bool operator==( const figure & other ) const
+	{
+		return m_fig == other;
+	}
 	char m_symbol;
 	double m_weight;
 	figure m_fig;
 };
 
 template< int stat_data_index >
-sym_info search_region_symbol( const found_number& best_number, const Mat& etal, const Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
+void search_region_symbol( found_number& number, const Mat& etal, const Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
 {
-	sym_info ret;
+//	number.m_figs.push_back( figure( reg_center, make_pair( 1, 1 ) ) );
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
-//	best_number.figs.push_back( figure( nearest_black, pair_int( 0, 0 ) ) );
+//	number.m_figs.push_back( figure( nearest_black, make_pair( 1, 1 ) ) );
 //	return;
 
 	if ( nearest_black.first != -1
 		&& nearest_black.second != -1 )
 	{
 		figure top_border_fig;
+		figure conture_fig;
 		Mat to_search = etal.clone();
 		// Ищем контуры по верхней границе
 		add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_search, top_border_fig, -1, nearest_black.second + 1 );
 		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
 		{
 			Mat to_contur = etal.clone();
-			figure conture_fig;
 			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_contur, conture_fig, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
 			if ( conture_fig.width() >= static_cast< int >( avarage_height ) ) // если широкая фигура, то скорее всего захватили рамку
 			{
@@ -903,35 +906,16 @@ sym_info search_region_symbol( const found_number& best_number, const Mat& etal,
 				figure short_fig;
 				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
 				add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
-				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
+				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
 			}
 			else if ( last_symbol && conture_fig.width() >= static_cast< int >( avarage_height * 0.80 ) ) // если последняя фигура, то могли захватить болтик черный
 			{
 				// Тут делаю обработку захвата болтика
 				conture_fig = figure( conture_fig.left(), conture_fig.left() + static_cast< int >( avarage_height * 0.60 ), conture_fig.top(), conture_fig.bottom() );
 			}
-			if ( find( best_number.figs.begin(), best_number.figs.end(), conture_fig ) == best_number.figs.end() )
-			{
-				ret.m_fig = conture_fig;
-				const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
-				if ( sym_sym.first != 0 )
-				{
-					ret.m_symbol = sym_sym.first;
-					ret.m_weight = sym_sym.second;
-				}
-				else
-				{
-					ret.m_symbol = '?';
-				}
-			}
-			else
-			{
-				ret.m_symbol = '?';
-			}
 		}
 		else
 		{
-
 			// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
 			Mat to_stable = etal.clone();
 			figure short_fig;
@@ -939,32 +923,33 @@ sym_info search_region_symbol( const found_number& best_number, const Mat& etal,
 			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
 			if ( !short_fig.is_empty() )
 			{
-				figure conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
-
-				// кажется нашли рамку
-				ret.m_fig = conture_fig;
-				const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
-				if ( sym_sym.first != 0 )
-				{
-					ret.m_symbol = sym_sym.first;
-					ret.m_weight = sym_sym.second;
-				}
-				else
-				{
-					ret.m_symbol = '?';
-				}
+				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
 			}
 			else
 			{
-				ret.m_symbol = '?';
+				conture_fig = figure();
 			}
+		}
+		if ( !conture_fig.is_empty()
+			&& find( number.m_figs.begin(), number.m_figs.end(), conture_fig ) == number.m_figs.end()
+			&& static_cast< double >( conture_fig.height() ) > 0.5 * avarage_height
+			&& static_cast< double >( conture_fig.width() ) > 0.2 * avarage_height
+			)
+		{
+			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
+			number.m_figs.push_back( conture_fig );
+			number.m_number += sym_sym.first;
+			number.m_weight += static_cast< int >( sym_sym.second );
+		}
+		else
+		{
+			number.m_number += '?';
 		}
 	}
 	else
 	{
-		ret.m_symbol = '?';
+		number.m_number += '?';
 	}
-	return ret;
 }
 
 pair_int calc_center( const vector< figure >& figs, const vector< vector< pair_doub > >& data, int index )
@@ -1022,15 +1007,67 @@ vector< vector< pair_doub > > get_3_sym_reg_koef( const vector< figure >& figs, 
 	return ret;
 }
 
-void func( vector< vector< pair_doub > > (*koef_getter)( const vector< figure >&, double, double ), const vector< figure >& figs, double avarage_height, double sin_avarage_angle_by_y )
+// выбираем что лучше подходит 2-х или 3-х символьный регион
+vector< sym_info > select_sym_info( const vector< sym_info >& fs2, const vector< sym_info >& fs3 )
 {
-	koef_getter( figs, avarage_height, sin_avarage_angle_by_y );
+	assert( fs2.size() == 2U );
+	assert( fs3.size() == 3U );
+	if ( fs3.at( 0 ).m_symbol != '1' && fs3.at( 0 ).m_symbol != '7' )
+	{
+		return fs2;
+	}
+	else if ( fs3.at( 0 ).m_symbol == '?' || fs3.at( 1 ).m_symbol == '?' || fs3.at( 2 ).m_symbol == '?' )
+	{
+		return fs2;
+	}
+	else
+	{
+		return fs3;
+	}
+}
+
+bool not_in_char_distance( int val )
+{
+	return val <= 0 || val >= 255;
+}
+
+bool compare_regions( const found_number& lh, const found_number& rh )
+{
+	const bool lh_in_reg_list = region_codes().find( lh.m_number ) != region_codes().end();
+	const bool rh_in_reg_list = region_codes().find( rh.m_number ) != region_codes().end();
+	if ( lh_in_reg_list != rh_in_reg_list )
+	{
+		return rh_in_reg_list;
+	}
+	else
+	{
+		const int cnp = lh.count_not_parsed_syms();
+		const int cnp_other = rh.count_not_parsed_syms();
+		if ( cnp != cnp_other )
+		{
+			return cnp > cnp_other;
+		}
+		else
+		{
+			return lh.m_weight < rh.m_weight;
+		}
+	}
+}
+
+pair_int get_pos_next_in_region( const vector< figure >& figs, const vector< vector< pair_doub > >& move_reg, const int index, const found_number& number, const double avarage_height )
+{
+	pair_int ret = calc_center( figs, move_reg, index );
+	if ( number.m_number.at( number.m_number.size() - 1 ) != '?' )
+	{
+		return number.m_figs.at( number.m_figs.size() - 1 ).center() + make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
+	}
+	return ret;
 }
 
 template< int stat_data_index >
-void search_region( found_number& best_number, const Mat& etal, const Mat& original, number_data& stat_data )
+void search_region( found_number& best_number, const int best_level, const Mat& original, number_data& stat_data )
 {
-	const vector< figure >& figs = best_number.figs;
+	const vector< figure >& figs = best_number.m_figs;
 	if ( figs.size() != 6 ) // ищем регион только если у нас есть все 6 символов
 	{
 		return;
@@ -1057,50 +1094,57 @@ void search_region( found_number& best_number, const Mat& etal, const Mat& origi
 	avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
 	const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
 
-	vector< sym_info > fs;
-/*	{
-		const vector< vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
-		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data ) );
-		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 1 ), avarage_height, true, stat_data ) );
-	}*/
+	vector< int > levels_to_iterate;
+	for ( int nn = best_level - 20; nn <= best_level + 20; nn += 10 )
 	{
-		const vector< vector< pair_doub > > move_reg_by_3_sym_reg( get_3_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
-		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data ) );
-		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 1 ), avarage_height, false, stat_data ) );
-		fs.push_back( search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 2 ), avarage_height, true, stat_data ) );
+		levels_to_iterate.push_back( nn );
 	}
+	levels_to_iterate.erase( remove_if( levels_to_iterate.begin(), levels_to_iterate.end(), &not_in_char_distance ), levels_to_iterate.end() );
+//	levels_to_iterate.push_back( best_level + 10 );
 
-	for ( size_t nn = 0; nn < fs.size(); ++nn )
+	vector< found_number > nums;
+	for ( size_t nn = 0; nn < levels_to_iterate.size(); ++nn )
 	{
-		best_number.number += fs.at( nn ).m_symbol;
-	}
-
-/*	{
- 		// коэффициенты смещения символов региона из 3-х букв относительно остальных символов номера
-		vector< vector< pair_doub > > move_reg_by_3_sym_reg;
-		fill_reg( move_reg_by_3_sym_reg, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
-		fill_reg( move_reg_by_3_sym_reg, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
-		fill_reg( move_reg_by_3_sym_reg, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
-		fill_reg( move_reg_by_3_sym_reg, 2.9855, -0.2421, 3.7117, -0.2421, 4.4379, -0.2421 );
-		fill_reg( move_reg_by_3_sym_reg, 2.0172, -0.4034, 2.7434, -0.4034, 3.4696, -0.4034 );
-		fill_reg( move_reg_by_3_sym_reg, 1.0490, -0.4034, 1.7752, -0.4034, 2.5013, -0.4034 );
-
-		const double diff_by_x_3_sym = move_reg_by_3_sym_reg[ 0 ][ 0 ].first - move_reg_by_3_sym_reg[ move_reg_by_3_sym_reg.size() - 1 ][ 0 ].first;
-		const double koef_by_x_3_sym = ( ( figs.at( figs.size() - 1 ).center().first - figs.at( 0 ).center().first ) / avarage_height ) / diff_by_x_3_sym;
-		for ( size_t nn = 0; nn < move_reg_by_3_sym_reg.size(); ++nn )
+		Mat etal = original > levels_to_iterate.at( nn );
 		{
-			for ( size_t mm = 0; mm < move_reg_by_3_sym_reg[ nn ].size(); ++mm )
-			{
-				move_reg_by_3_sym_reg[ nn ][ mm ].first = move_reg_by_3_sym_reg[ nn ][ mm ].first * avarage_height * koef_by_x_3_sym;
-				const double angle_offset = sin_avarage_angle_by_y * move_reg_by_3_sym_reg[ nn ][ mm ].first;
-				move_reg_by_3_sym_reg[ nn ][ mm ].second = move_reg_by_3_sym_reg[ nn ][ mm ].second * avarage_height + angle_offset;
-			}
+			found_number fs2;
+			const vector< vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
+			search_region_symbol< stat_data_index >( fs2, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data );
+			const pair_int next_2 = get_pos_next_in_region( figs, move_reg_by_2_sym_reg, 1, fs2, avarage_height );
+			search_region_symbol< stat_data_index >( fs2, etal, original, next_2, avarage_height, true, stat_data );
+			nums.push_back( fs2 );
 		}
+		{
+			found_number fs3;
+			const vector< vector< pair_doub > > move_reg_by_3_sym_reg( get_3_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
+			search_region_symbol< stat_data_index >( fs3, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data );
+			const pair_int next_2 = get_pos_next_in_region( figs, move_reg_by_3_sym_reg, 1, fs3, avarage_height );
+/*			pair_int next_2 = calc_center( figs, move_reg_by_3_sym_reg, 1 );
+			if ( fs3.m_number.at( fs3.m_number.size() - 1 ) != '?' )
+			{
+				next_2 = fs3.m_figs.at( fs3.m_figs.size() - 1 ).center() + make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
+			}*/
+			search_region_symbol< stat_data_index >( fs3, etal, original, next_2, avarage_height, false, stat_data );
+			const pair_int next_3 = get_pos_next_in_region( figs, move_reg_by_3_sym_reg, 2, fs3, avarage_height );
+/*			pair_int next_3 = calc_center( figs, move_reg_by_3_sym_reg, 2 );
+			if ( fs3.m_number.at( fs3.m_number.size() - 1 ) != '?' )
+			{
+				next_3 = fs3.m_figs.at( fs3.m_figs.size() - 1 ).center() + make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
+			}*/
+			search_region_symbol< stat_data_index >( fs3, etal, original, next_3, avarage_height, true, stat_data );
+			nums.push_back( fs3 );
+		}
+	}
+	sort( nums.begin(), nums.end(), &compare_regions );
+	vector< found_number >::const_iterator it = max_element( nums.begin(), nums.end(), &compare_regions );
 
-		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data );
-		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 1 ), avarage_height, false, stat_data );
-		search_region_symbol< stat_data_index >( best_number, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 2 ), avarage_height, true, stat_data );
-	}*/
+	best_number.m_number.append( it->m_number );
+	best_number.m_weight += it->m_weight;
+	for ( size_t nn = 0; nn < it->m_figs.size(); ++nn )
+	{
+		best_number.m_figs.push_back( it->m_figs.at( nn ) );
+	}
+
 }
 
 pair< string, int > read_number( const Mat& image, int gray_step )
@@ -1239,46 +1283,47 @@ pair< string, int > read_number_loop( const Mat& input, const vector< int >& sea
 		{
 			found_number& best_number = found_nums.at( best_index );
 			const Mat& gray_image = create_gray_image( input );
+			const int& best_level = search_levels.at( best_index ) - 10;
 			switch ( free_index )
 			{
 			case 0:
-				search_region< 0 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 0 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 1:
-				search_region< 1 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 1 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 2:
-				search_region< 2 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 2 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 3:
-				search_region< 3 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 3 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 4:
-				search_region< 4 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 4 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 5:
-				search_region< 5 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 5 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 6:
-				search_region< 6 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 6 >( best_number, best_level, gray_image, stat_data );
 				break;
 			case 7:
-				search_region< 7 >( best_number, gray_image > search_levels.at( best_index ), gray_image, stat_data );
+				search_region< 7 >( best_number, best_level, gray_image, stat_data );
 				break;
 			default:
 				throw runtime_error( "invalid data index" );
 			};
 
 			// рисуем квадрат номера
-			Mat num_rect_image = input.clone();
-			for ( size_t nn = 0; nn < best_number.figs.size(); ++nn )
+/*			Mat num_rect_image = input.clone();
+			for ( size_t nn = 0; nn < best_number.m_figs.size(); ++nn )
 			{
-				const figure& cur_fig = best_number.figs[ nn ];
+				const figure& cur_fig = best_number.m_figs[ nn ];
 				rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
-			}
+			}*/
 
-			imwrite( next_name( "etal" ), num_rect_image );
-			imwrite( next_name( "binary" ), gray_image > search_levels.at( best_index ) );
+//			imwrite( next_name( "etal" ), num_rect_image );
+//			imwrite( next_name( "binary" ), gray_image > search_levels.at( best_index ) );
 
 			ret = best_number.to_pair();
 		}
