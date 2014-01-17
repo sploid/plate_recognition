@@ -1,8 +1,8 @@
 Measurements (version pre beta)
 =================
-1. AMD Phenom X6 3.20 GHz,  4 GB, Win7 64, VS 2012, OpenCV 4.2.8 (commit d53a60906976fadc50b774d80c4831c23fa7c0a1)
-2. AMD Phenom X6 3.20 GHz,  4 GB, Win7 64, MinGW,   OpenCV 4.2.7 (commit d53a60906976fadc50b774d80c4831c23fa7c0a1)
-3. Intel Core i7 3.40 GHz, 16 GB, Win7 64, VS 2013, OpenCV 4.2.8 (regions without)
+1. AMD Phenom X6 3.20 GHz,  4 GB, Win7 64, VS 2012, OpenCV 2.4.8 (commit d53a60906976fadc50b774d80c4831c23fa7c0a1)
+2. AMD Phenom X6 3.20 GHz,  4 GB, Win7 64, MinGW,   OpenCV 2.4.7 (commit d53a60906976fadc50b774d80c4831c23fa7c0a1)
+3. Intel Core i7 3.40 GHz, 16 GB, Win7 64, VS 2013, OpenCV 2.4.8 (regions without)
 
 image                                |size     | 1 (out - time)         | 2 (out - time)         | 3 (out - time)       |
 -------------------------------------|---------|------------------------|------------------------|----------------------|
