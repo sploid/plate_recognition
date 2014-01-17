@@ -1,4 +1,5 @@
 #include "sym_recog.h"
+#include <stdexcept>
 #include <opencv2/opencv.hpp>
 #include "utils.h"
 #include "syms.h"
