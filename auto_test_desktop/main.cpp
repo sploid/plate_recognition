@@ -49,7 +49,8 @@ private:
 			const pair< string, int > number = read_number( image, 10 );
 			if ( file_number != number.first )
 			{
-				to_out << "~~" << setw( 9 ) << setfill( ' ' ) << number.first << "~~";
+
+				to_out << setw( 13 ) << setfill( ' ' ) << ( string( "~~" ) + number.first + "~~" );
 			}
 			else
 			{

@@ -11,7 +11,7 @@ image    |size     | 1 (out - time)         | 2 (out - time)       |
  [A199PK190](test_data/A199PK190.jpg)| 720x1280|    A199PK190 -  0.81999|A199PK     - 0.290779 |
  [B202HK150](test_data/B202HK150.jpg)| 720x1280|    B202HK150 -  0.69338|B202HK     - 0.273169 |
    [B570BB78](test_data/B570BB78.jpg)| 739x1024|     B570BB78 -  0.48773|B570BB     - 0.182119 |
- [C193PB150](test_data/C193PB150.png)|  240x320|~~   H23??X~~ - 0.057252|~~H92??X~~ - 0.0251069|
+ [C193PB150](test_data/C193PB150.png)|  240x320|   ~~H23??X~~ - 0.057252|~~H92??X~~ - 0.0251069|
    [C202CC36](test_data/C202CC36.jpg)|  480x640|     C202CC36 -  0.17169|C202CC     - 0.0654261|
  [C226CC197](test_data/C226CC197.jpg)| 660x1000|    C226CC197 -    0.435|C226CC     - 0.166877 |
    [C333CC26](test_data/C333CC26.jpg)|  800x600|     C333CC26 -  0.27117|C333CC     - 0.0969321|
@@ -24,7 +24,7 @@ image    |size     | 1 (out - time)         | 2 (out - time)       |
    [H700MA39](test_data/H700MA39.jpg)|  600x900|     H700MA39 -  0.37994|H700MA     - 0.150976 |
  [H826BX197](test_data/H826BX197.jpg)| 683x1000|~~H826BE197~~ -  0.53482|~~H826BE~~ - 0.211851 |
  [K615HK178](test_data/K615HK178.jpg)| 720x1280|    K615HK178 -  0.67083|K615HK     - 0.270497 | 
- [M520PX190](test_data/M520PX190.jpg)| 740x1280|~~ Y520YX19~~ -  0.63071|~~Y220YX~~ - 0.253824 |
+ [M520PX190](test_data/M520PX190.jpg)| 740x1280| ~~Y520YX19~~ -  0.63071|~~Y220YX~~ - 0.253824 |
    [M777HP69](test_data/M777HP69.jpg)| 768x1024|     M777HP69 -  0.51685|M777HP     - 0.211389 |
    [O113YC64](test_data/O113YC64.png)|   50x235|     O113YC64 - 0.010155|O113YC     - 0.0107311|
    [O363CH39](test_data/O363CH39.jpg)|  600x900|     O363CH39 -  0.42418|O363CH     - 0.159271 |
@@ -35,6 +35,6 @@ image    |size     | 1 (out - time)         | 2 (out - time)       |
  [T022EP197](test_data/T022EP197.jpg)| 704x1000|    T022EP197 -   0.5148|T022EP     - 0.199856 |
    [T666TT36](test_data/T666TT36.jpg)|  480x640|     T666TT36 -  0.20299|T666TT     - 0.0801291|
    [T888AM98](test_data/T888AM98.jpg)| 738x1024|     T888AM98 -   0.4997|T888AM     - 0.1888   |
- [X262HP197](test_data/X262HP197.jpg)| 664x1280|~~ X262HP11~~ -  0.57111|X262HP     - 0.210416 |
+ [X262HP197](test_data/X262HP197.jpg)| 664x1280| ~~X262HP11~~ -  0.57111|X262HP     - 0.210416 |
  [Y900XA177](test_data/Y900XA177.jpg)|  452x660|    Y900XA177 -  0.21928|~~Y200XA~~ - 0.0864123|
  summary                             |         |                 13.7298|             4.9506873|
