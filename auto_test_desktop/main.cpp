@@ -1,5 +1,6 @@
 #include "engine.h"
 #include <iostream>
+#include <iomanip>
 #include <conio.h>
 
 #include <opencv2/opencv.hpp>
@@ -32,19 +33,29 @@ private:
 	{
 		using namespace std;
 		stringstream to_out;
-		const string file_number( m_file_name.substr( m_folder_name.size() + 1, m_file_name.size() - m_folder_name.size() - 5 ) );
-		to_out << file_number << "   ";
+		const string file_name_ext( m_file_name.substr( m_folder_name.size() + 1, m_file_name.size() - m_folder_name.size() - 1 ) );
+		const string file_number( file_name_ext.substr( 0, file_name_ext.size() - 4 ) );
+		string number_to_out( "[" );
+		number_to_out += file_number + "](test_data/" + file_name_ext + ")";
+		to_out << setw( 37 ) << setfill( ' ' ) << number_to_out << "|";
 		const cv::Mat image = cv::imread( m_file_name.c_str(), CV_LOAD_IMAGE_COLOR );   // Read the file
+		stringstream size_stream;
+		size_stream << image.rows << "x" << image.cols;
+		to_out << setw( 9 ) << setfill( ' ' ) << size_stream.str() << "|";
 		int sum = 0;
 		if( image.data )
 		{
 			const int64 begin = cv::getTickCount();
 			const pair< string, int > number = read_number( image, 10 );
-			to_out << number.first << "   " << number.second << "   " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency());
 			if ( file_number != number.first )
 			{
-				to_out << "  !!  ";
+				to_out << "~~" << setw( 9 ) << setfill( ' ' ) << number.first << "~~";
 			}
+			else
+			{
+				to_out << setw( 13 ) << setfill( ' ' ) << number.first;
+			}
+			to_out << " - "  << setw( 8 ) << setfill( ' ' ) << setprecision( 5 ) << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << "|" << number.second << "   ";
 			to_out << endl;
 			sum = number.second;
 		}
