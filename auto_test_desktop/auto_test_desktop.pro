@@ -4,7 +4,6 @@ CONFIG(debug, debug|release) {
 	DESTDIR = $$_PRO_FILE_PWD_/../bin/release
 }
 
-CONFIG += console
 INCLUDEPATH += $$_PRO_FILE_PWD_/../plate_recog_lib
 win32 {
 	mingw {
@@ -13,10 +12,16 @@ win32 {
 	} else {
 		LIBS += $${DESTDIR}/plate_recog_lib.lib
 	}
+} android {
+	LIBS += -L$${DESTDIR} \
+		-lplate_recog_lib
 }
-QT -= gui
+QT += gui widgets
 
 SOURCES = \
 		main.cpp
 
 include(../opencv.pri)
+
+RESOURCES += \
+		../other/neural_net.qrc

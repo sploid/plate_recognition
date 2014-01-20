@@ -85,11 +85,12 @@ static pair_int g_pix_around[ COUNT_GLOBAL_DATA ][ 4 ] = {
 	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
 	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
 	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) } };
-static bool g_busy_indexes[ COUNT_GLOBAL_DATA ] = { false, false, false, false, false, false, false, false };
 
 #ifdef _WIN32
 
 #include <windows.h>
+
+static bool g_busy_indexes[ COUNT_GLOBAL_DATA ] = { false, false, false, false, false, false, false, false };
 HANDLE h_data_guard = CreateMutex( NULL, FALSE, NULL );
 int get_free_index()
 {
@@ -955,7 +956,7 @@ void search_region_symbol( found_number& number, const Mat& etal, const Mat& ori
 
 pair_int calc_center( const vector< figure >& figs, const vector< vector< pair_doub > >& data, int index )
 {
-	const static int figs_size = 6;
+	const static size_t figs_size = 6;
 	assert( figs.size() >= figs_size );
 	pair_int ret( 0, 0 );
 	for ( size_t nn = 0; nn < figs_size; ++nn )

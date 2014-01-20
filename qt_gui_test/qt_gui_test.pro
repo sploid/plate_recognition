@@ -12,6 +12,9 @@ win32 {
 	} else {
 		LIBS += $${DESTDIR}/plate_recog_lib.lib
 	}
+} android {
+	LIBS += -L$${DESTDIR} \
+		-lplate_recog_lib
 }
 QT += widgets
 

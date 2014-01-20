@@ -7,6 +7,7 @@ CONFIG(debug, debug|release) {
 DEFINES += PLATE_RECOG_LIB
 QT -= gui core
 TEMPLATE = lib
+CONFIG += static
 
 HEADERS = \
 		engine.h \

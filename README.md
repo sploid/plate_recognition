@@ -2,7 +2,9 @@ Automatic number plate recognition library
 =================
 Cross-platform ANPR open source library ( C++ )
 
-[Measuring recognition](https://github.com/sploid/plate_recognition/blob/master/Measurements.md)
+[Measuring recognition](Measurements.md)
+
+Support only Russian plate GOST 50577-93.
 
 Support platforms
 -------
@@ -26,8 +28,8 @@ Dependencies
 
 Recognition library depends only on OpenCV
 
-
 Build with qmake
 -------
 1. In file "opencv.pri" set path to OpenCV.
 2. In file "opencv.pri" set version of OpenCV.
+3. In file "auto_test_desktop/main.cpp" hardcoded folder for test images.

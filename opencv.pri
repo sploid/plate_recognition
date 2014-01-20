@@ -1,14 +1,16 @@
 #==============  Надо задать  =================================================
 # путь к библиотеке OpenCV
-OPENCV_DIR = C:/soft/opencv428/opencv/build
+win32 {
+	OPENCV_DIR = C:/soft/opencv427/opencv/build
+} android { # windows from OpenCV NVidia pack
+	OPENCV_DIR = C:\soft\OpenCV-2.4.8-android-sdk\sdk\native
+}
 # версия библиотеки OpenCV
 OPENCV_VER = 248
 #==============================================================================
 
-
-INCLUDEPATH += $${OPENCV_DIR}/include
-
 win32 {
+	INCLUDEPATH += $${OPENCV_DIR}/include
 	mingw {
 		LIBS += -L$${OPENCV_DIR}/x86/mingw/lib \
 			-lopencv_calib3d$${OPENCV_VER}.dll \
@@ -72,5 +74,28 @@ win32 {
 				opencv_video$${OPENCV_VER}.lib \
 				opencv_videostab$${OPENCV_VER}.lib
 		}
+	}
+} android {
+#	message($${ANDROID_TARGET_ARCH})
+	CONFIG += mobility
+	equals(ANDROID_TARGET_ARCH, armeabi-v7a) {
+		INCLUDEPATH += $${OPENCV_DIR}/jni/include
+		LIBS += -L$${OPENCV_DIR}/libs/armeabi-v7a \
+				-L$${OPENCV_DIR}/3rdparty/libs/armeabi-v7a \
+				-lopencv_imgproc \
+				-lopencv_highgui \
+				-lopencv_ml \
+				-lopencv_features2d \
+				-lopencv_objdetect \
+				-lopencv_ts \
+				-lopencv_contrib \
+				-lopencv_calib3d \
+				-lopencv_core \
+				-ltbb \
+				-llibjasper \
+				-llibpng \
+				-llibjpeg \
+				-llibtiff \
+				-lIlmImf
 	}
 }

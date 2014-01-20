@@ -1,9 +1,13 @@
 #include <opencv2/opencv.hpp>
 
+#ifdef _MSC_VER
 #pragma warning( push )
 #pragma warning( disable : 4127 4512 )
+#endif
 #include <QDir>
+#ifdef _MSC_VER
 #pragma warning( pop )
+#endif
 #include <QCoreApplication>
 
 #include "sym_recog.h"
