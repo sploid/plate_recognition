@@ -16,7 +16,11 @@ inline std::string next_name( const std::string& key, const std::string& ext = "
 		it = cache.find( key );
 	}
 	std::stringstream ss;
+#ifdef ANDROID
+	ss << "/storage/sdcard0/imgs/" << key << "_" << it->second++ << "." << ext;
+#else
 	ss << "C:\\imgs\\debug\\" << key << "_" << it->second++ << "." << ext;
+#endif
 	return ss.str();
 }
 
