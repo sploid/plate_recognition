@@ -10,9 +10,9 @@ Support platforms
 -------
 * Windows - norm
 * Android - norm
-* iOS - not tested yet, but should support
+* Linux (Debian) - norm
 * Mac - not tested yet, but should support
-* Linux - not tested yet, but should support
+* iOS - not tested yet, but should support
 
 Compilers
 -------
@@ -20,6 +20,7 @@ Compilers
 * Visual Studio 2013 - norm
 * mingw-g++ - norm
 * Android NDK r9b - norm
+* g++ 4.7.2 - norm
 
 Dependencies
 -------
@@ -32,4 +33,4 @@ Build with qmake
 -------
 1. In file "opencv.pri" set path to OpenCV.
 2. In file "opencv.pri" set version of OpenCV.
-3. In file "auto_test_desktop/main.cpp" hardcoded folder for test images.
+3. In file "auto_test_desktop/main.cpp" hardcoded folder for test images for Android device.

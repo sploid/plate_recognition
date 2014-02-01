@@ -15,6 +15,9 @@ win32 {
 } android {
 	LIBS += -L$${DESTDIR} \
 		-lplate_recog_lib
+} linux {
+	LIBS += -L$${DESTDIR} \
+		-lplate_recog_lib
 }
 QT += widgets
 
