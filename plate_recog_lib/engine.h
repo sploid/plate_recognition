@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <utility>
-#include "plate_recog_lib_config.h"
 
 namespace cv
 {
@@ -16,5 +15,5 @@ namespace cv
 
 // @todo: M520PX190.jpg - большой угол и слева шуруп, поэтому левая буква М не распознается
 
-std::pair< std::string, int > PLATE_RECOG_EXPORT read_number( const cv::Mat& image, int gray_step = 0 );
-std::pair< std::string, int > PLATE_RECOG_EXPORT read_number_by_level( const cv::Mat& image, int gray_level );
+std::pair< std::string, int > read_number( const cv::Mat& image, int gray_step = 0 );
+std::pair< std::string, int > read_number_by_level( const cv::Mat& image, int gray_level );

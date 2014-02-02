@@ -1,10 +1,16 @@
 #pragma once
-#include "plate_recog_lib_config.h"
 #include <streambuf>
 #include <iostream>
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4127 4512 4244 )
+#endif
 #include <QDebug>
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
-class PLATE_RECOG_EXPORT std_cout_2_qdebug : public std::basic_streambuf<char>
+class std_cout_2_qdebug : public std::basic_streambuf<char>
 {
 public:
 	std_cout_2_qdebug()
@@ -32,7 +38,7 @@ protected:
 
 	virtual std::streamsize xsputn( const char *p, std::streamsize n )
 	{
-		qDebug() << QString::fromLocal8Bit( p, n );
+		qDebug() << QString::fromLocal8Bit( p, static_cast< int >( n ) );
 		return n;
 	}
 

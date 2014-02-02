@@ -25,9 +25,14 @@ Compilers
 Dependencies
 -------
 * OpenCV for image processing
-* Qt for interaction with the OS
+* Qt
 
 Recognition library depends only on OpenCV.
+
+Why auto_test_desktop program depends on Qt?
+* read/write directory files list
+* implement work thread in not gui thread
+
 
 Build with qmake
 -------

@@ -8,12 +8,9 @@
 
 #ifdef _MSC_VER
 #pragma warning( push )
-#pragma warning( disable : 4127 4512 )
+#pragma warning( disable : 4127 4512 4244 4251 4800 )
 #endif
 #include <QDir>
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 #include <QApplication>
 #include <QThreadPool>
 #include <QMutex>
@@ -21,6 +18,9 @@
 #include <QTemporaryFile>
 #include <QDialog>
 #include <QPushButton>
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
 #include "sym_recog.h"
 

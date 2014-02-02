@@ -12,7 +12,6 @@ CONFIG += static
 HEADERS = \
 		engine.h \
 		figure.h \
-		plate_recog_lib_config.h \
 		sym_recog.h \
 		syms.h \
 		utils.h
