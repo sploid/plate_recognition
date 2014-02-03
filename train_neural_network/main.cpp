@@ -1,3 +1,4 @@
+#include <fstream>
 #include <opencv2/opencv.hpp>
 
 #ifdef _MSC_VER
@@ -52,10 +53,49 @@ vector< pair< char, Mat > > train_data( bool num )
 	return ret;
 }
 
-string path_to_save_train( bool num )
+pair< string, string > path_to_save_train( bool num )
 {
-	const string nn_config_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../other" ).toLocal8Bit() );
-	return num ? nn_config_folder + "\\neural_net_num.yml" : nn_config_folder + "\\neural_net_char.yml";
+	const string core_part = num ? "num" : "char";
+	const string root_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../.." ).toLocal8Bit() );
+	return make_pair( root_folder + "/other/neural_net_" + core_part + ".yml", root_folder + "/plate_recog_lib/neural_net_" + core_part + ".cpp");
+}
+
+void save_to_cpp( const string& source_file_name, const string& dest_file_name, const string& var_name )
+{
+	{
+		ifstream source_stream( source_file_name );
+		ofstream dest_stream( dest_file_name );
+		if ( !dest_stream.is_open() || !source_stream.is_open() )
+		{
+			cout << "!!! Failed open stream !!!" << endl;
+		}
+
+		dest_stream << endl << "const char " << var_name << "[] = {" << endl;
+		dest_stream.setf ( std::ios::hex, std::ios::basefield ); 
+		int curr_index = 0;
+		while ( source_stream.good() )
+		{
+			const char next_sym = static_cast< char >( source_stream.get() );
+			if ( source_stream.good() )
+			{
+				if ( curr_index != 0 )
+				{
+					dest_stream << ", ";
+				}
+				dest_stream << " 0x";
+				dest_stream.width( 2 );
+				dest_stream.fill( '0' );
+				dest_stream << static_cast< int >( next_sym );
+
+				++curr_index;
+				if ( curr_index % 100 == 0 )
+				{
+					dest_stream << endl;
+				}
+			}
+		}
+		dest_stream << endl << " };" << endl;
+	}
 }
 
 void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row, bool num )
@@ -227,8 +267,10 @@ void make_training( bool num )
 	theRNG().state = 0x111111;
 	CvANN_MLP mlp( configs.at( best_index ) );
 	mlp.train( input, output, weights );
-	FileStorage fs( path_to_save_train( num ), cv::FileStorage::WRITE );
+	const pair< string, string > file_path = path_to_save_train( num );
+	FileStorage fs( file_path.first, cv::FileStorage::WRITE );
 	mlp.write( *fs, "mlp" );
+	save_to_cpp( file_path.first, file_path.second, string( "neural_net_" ) + ( num ? "num" : "char" ) );
 }
 
 int main( int argc, char** argv )
