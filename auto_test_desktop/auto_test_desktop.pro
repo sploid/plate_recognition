@@ -25,6 +25,3 @@ SOURCES = \
 		main.cpp
 
 include(../opencv.pri)
-
-RESOURCES += \
-		../other/neural_net.qrc

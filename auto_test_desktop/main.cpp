@@ -92,67 +92,38 @@ public:
 	}
 
 protected:
-	QString create_native_file( const QString& rc_path )
-	{
-		QTemporaryFile net_char( "net_char.yml" );
-		if ( net_char.open() )
-		{
-			QFile rc_fl( rc_path );
-			if ( rc_fl.open( QIODevice::ReadOnly ) )
-			{
-				net_char.setAutoRemove( false );
-				net_char.write( rc_fl.readAll() );
-				return net_char.fileName();
-			}
-		}
-		return "";
-	}
-
 	virtual void run()
 	{
 		using namespace std;
 		stringstream to_out;
-		const QString net_char_file_name = create_native_file( ":/net/neural_net_char.yml" );
-		const QString net_num_file_name = create_native_file( ":/net/neural_net_num.yml" );
-		if ( !net_char_file_name.isEmpty() && !net_num_file_name.isEmpty() )
+		try
 		{
-			try
-			{
-				init_recognizer( net_num_file_name.toLocal8Bit().data(), net_char_file_name.toLocal8Bit().data() );
-				const int64 begin = cv::getTickCount();
-				// грузим список картинок
+			init_recognizer();
+			const int64 begin = cv::getTickCount();
+			// грузим список картинок
 
-				QDir image_dir( m_image_folder.c_str() );
-				if ( image_dir.exists() )
-				{
-					to_out << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
-					const QStringList all_files = image_dir.entryList( QStringList() << "*.*", QDir::Files|QDir::Readable );
-					QThreadPool::globalInstance()->setMaxThreadCount( 2 ); // тут минимум 2, т.к. если будет 1, то потоки обработки не будут запускаться
-					for ( int nn = 0; nn < all_files.size(); ++nn )
-					{
-						const string next_file_name = QDir::toNativeSeparators( QString::fromLocal8Bit( m_image_folder.c_str() ) + "/" + all_files.at( nn ) ).toLocal8Bit().data();
-						QThreadPool::globalInstance()->start( new process_file_task( m_image_folder, next_file_name ) );
-					}
-					QThreadPool::globalInstance()->waitForDone();
-					to_out << "sum: " << process_file_task::m_sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
-				}
-				else
-				{
-					to_out << "Error, folder not exists";
-				}
-			}
-			catch ( const std::exception& e )
+			QDir image_dir( m_image_folder.c_str() );
+			if ( image_dir.exists() )
 			{
-				qDebug() << "Catch exeption, what: " << e.what();
+				to_out << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
+				const QStringList all_files = image_dir.entryList( QStringList() << "*.*", QDir::Files|QDir::Readable );
+				QThreadPool::globalInstance()->setMaxThreadCount( 2 ); // тут минимум 2, т.к. если будет 1, то потоки обработки не будут запускаться
+				for ( int nn = 0; nn < all_files.size(); ++nn )
+				{
+					const string next_file_name = QDir::toNativeSeparators( QString::fromLocal8Bit( m_image_folder.c_str() ) + "/" + all_files.at( nn ) ).toLocal8Bit().data();
+					QThreadPool::globalInstance()->start( new process_file_task( m_image_folder, next_file_name ) );
+				}
+				QThreadPool::globalInstance()->waitForDone();
+				to_out << "sum: " << process_file_task::m_sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
+			}
+			else
+			{
+				to_out << "Error, folder not exists";
 			}
 		}
-		if ( !net_char_file_name.isEmpty() )
+		catch ( const std::exception& e )
 		{
-			QFile::remove( net_char_file_name );
-		}
-		if ( !net_num_file_name.isEmpty() )
-		{
-			QFile::remove( net_num_file_name );
+			to_out << "Catch exeption, what: " << e.what();
 		}
 		cout << to_out.str();
 	}
@@ -166,10 +137,8 @@ int main( int argc, char** argv )
 {
 	using namespace std;
 	QApplication a( argc, argv );
-#ifdef ANDROID
 	std_cout_2_qdebug cc;
 	(void)cc;
-#endif // ANDROID
 
 #ifndef ANDROID // for android hardcode image folder
 	if ( argc <= 1 )

@@ -20,7 +20,7 @@ cv::Mat from_file_to_row( const std::string& file_name );
 std::pair< char, double > proc_char( const cv::Mat& input );
 // recognize number
 std::pair< char, double > proc_num( const cv::Mat& input );
-// read configuration of neural networks
-void init_recognizer( const std::string& num_file_name, const std::string& char_file_name );
+// init recognizer
+void init_recognizer();
 // region codes
 const std::set< std::string >& region_codes();

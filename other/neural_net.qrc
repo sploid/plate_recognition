@@ -1,6 +1,0 @@
-<RCC>
-    <qresource prefix="/net">
-        <file>neural_net_char.yml</file>
-        <file>neural_net_num.yml</file>
-    </qresource>
-</RCC>

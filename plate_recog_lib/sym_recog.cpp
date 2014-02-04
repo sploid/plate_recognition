@@ -5,6 +5,9 @@
 #include "syms.h"
 #include "figure.h"
 
+#include "neural_net_char.cpp"
+#include "neural_net_num.cpp"
+
 using namespace cv;
 using namespace std;
 
@@ -12,7 +15,6 @@ namespace { namespace aux {
 	NeuralNet_MLP mlp_char;
 	NeuralNet_MLP mlp_num;
 	static set< string > g_region_codes;
-
 } }
 
 int search_max_val( const cv::Mat& data, int row )
@@ -194,12 +196,12 @@ std::pair< char, double > proc_num( const cv::Mat& input )
 	return proc_impl( input, aux::mlp_num, &index_to_char_num );
 }
 
-void init_nn( NeuralNet_MLP& mlp, const std::string& file_name )
+void init_nn( NeuralNet_MLP& mlp, const char* data )
 {
 	assert( mlp.get_layer_count() == 0 );
 	try
 	{
-		FileStorage fs( file_name, cv::FileStorage::READ );
+		FileStorage fs( data, cv::FileStorage::READ | cv::FileStorage::MEMORY );
 		FileNode fn = fs[ "mlp" ];
 		if ( !fn.empty() )
 		{
@@ -216,10 +218,10 @@ void init_nn( NeuralNet_MLP& mlp, const std::string& file_name )
 	}
 }
 
-void init_recognizer( const std::string& num_file_name, const std::string& char_file_name )
+void init_recognizer()
 {
-	init_nn( aux::mlp_char, char_file_name );
-	init_nn( aux::mlp_num, num_file_name );
+	init_nn( aux::mlp_char, neural_net_char );
+	init_nn( aux::mlp_num, neural_net_num );
 	aux::g_region_codes.insert( "178" ); // ХЗ
 	aux::g_region_codes.insert( "01" ); // Республика Адыгея
 	aux::g_region_codes.insert( "02" );

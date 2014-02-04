@@ -6,6 +6,8 @@ Cross-platform ANPR open source library ( C++ )
 
 Support only Russian plate GOST 50577-93.
 
+I have no build servers, so at the end of the description of the commit put a platform under which it was made.
+
 Support platforms
 -------
 * Windows - norm

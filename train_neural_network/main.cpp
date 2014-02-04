@@ -268,8 +268,11 @@ void make_training( bool num )
 	CvANN_MLP mlp( configs.at( best_index ) );
 	mlp.train( input, output, weights );
 	const pair< string, string > file_path = path_to_save_train( num );
-	FileStorage fs( file_path.first, cv::FileStorage::WRITE );
-	mlp.write( *fs, "mlp" );
+	{
+		FileStorage fs( file_path.first, cv::FileStorage::WRITE );
+		mlp.write( *fs, "mlp" );
+		fs.release();
+	}
 	save_to_cpp( file_path.first, file_path.second, string( "neural_net_" ) + ( num ? "num" : "char" ) );
 }
 
