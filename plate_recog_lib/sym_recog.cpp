@@ -196,7 +196,9 @@ std::pair< char, double > proc_num( const cv::Mat& input )
 	return proc_impl( input, aux::mlp_num, &index_to_char_num );
 }
 
-void init_nn( NeuralNet_MLP& mlp, const char* data )
+#include <fstream>
+
+void init_nn( NeuralNet_MLP& mlp, const string& data )
 {
 	assert( mlp.get_layer_count() == 0 );
 	try
@@ -220,8 +222,8 @@ void init_nn( NeuralNet_MLP& mlp, const char* data )
 
 void init_recognizer()
 {
-	init_nn( aux::mlp_char, neural_net_char );
-	init_nn( aux::mlp_num, neural_net_num );
+	init_nn( aux::mlp_char, string( neural_net_char, sizeof( neural_net_char ) ) );
+	init_nn( aux::mlp_num, string( neural_net_num, sizeof( neural_net_num ) ) );
 	aux::g_region_codes.insert( "178" ); // ХЗ
 	aux::g_region_codes.insert( "01" ); // Республика Адыгея
 	aux::g_region_codes.insert( "02" );

@@ -98,7 +98,7 @@ win32 {
 				-llibtiff \
 				-lIlmImf
 	}
-} linux {
+} linux:!android {
 	LIBS += -lopencv_calib3d \
 			-lopencv_contrib \
 			-lopencv_core \
