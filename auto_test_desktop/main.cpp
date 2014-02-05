@@ -148,7 +148,7 @@ int main( int argc, char** argv )
 	}
 	const string image_folder( argv[ 1 ] );
 #else
-	const string image_folder( "/storage/sdcard0/imgs" );
+	const string image_folder( "/storage/sdcard0/test_data" );
 #endif // ANDROID
 
 	QDialog *dlg = new QDialog();
