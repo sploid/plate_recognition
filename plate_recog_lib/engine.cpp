@@ -755,12 +755,13 @@ Mat create_gray_image( const Mat& input )
 	{
 		gray = input;
 	}
-	else if ( input.channels() == 3 )
+	else if ( input.channels() == 3 || input.channels() == 4 )
 	{
 		cvtColor( input, gray, CV_RGB2GRAY );
 	}
 	else
 	{
+		cout << "!!! Invalid chanel count: " << input.channels() << " !!!" << endl;
 		assert( !"не поддерживаемое количество каналов" );
 	}
 	return gray;
