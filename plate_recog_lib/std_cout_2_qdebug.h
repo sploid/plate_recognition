@@ -1,14 +1,18 @@
 #pragma once
 #include <streambuf>
 #include <iostream>
-#ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4127 4512 4244 )
-#endif
-#include <QDebug>
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
+#ifdef QT
+	#ifdef _MSC_VER
+		#pragma warning( push )
+		#pragma warning( disable : 4127 4512 4244 )
+		#endif // _MSC_VER
+		#include <QDebug>
+		#ifdef _MSC_VER
+		#pragma warning( pop )
+	#endif // _MSC_VER
+#else
+	#include <android/log.h>
+#endif // QT
 
 class std_cout_2_qdebug : public std::basic_streambuf<char>
 {
@@ -29,7 +33,9 @@ protected:
 	{
 		if ( v == '\n' )
 		{
+#ifdef QT
 			qDebug() << endl;
+#endif
 //			log_window->append("");
 		}
 		return v;
@@ -38,7 +44,12 @@ protected:
 
 	virtual std::streamsize xsputn( const char *p, std::streamsize n )
 	{
+#ifdef QT
 		qDebug() << QString::fromLocal8Bit( p, static_cast< int >( n ) );
+#else
+		__android_log_print( ANDROID_LOG_INFO, "JniANPR", "%s\n", p );
+
+#endif
 		return n;
 	}
 
