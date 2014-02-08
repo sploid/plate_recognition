@@ -10,9 +10,9 @@
 		#ifdef _MSC_VER
 		#pragma warning( pop )
 	#endif // _MSC_VER
-#else
+#elif defined ANDROID
 	#include <android/log.h>
-#endif // QT
+#endif
 
 class std_cout_2_qdebug : public std::basic_streambuf<char>
 {
@@ -36,7 +36,6 @@ protected:
 #ifdef QT
 			qDebug() << endl;
 #endif
-//			log_window->append("");
 		}
 		return v;
 	}
@@ -46,9 +45,8 @@ protected:
 	{
 #ifdef QT
 		qDebug() << QString::fromLocal8Bit( p, static_cast< int >( n ) );
-#else
+#elif defined ANDROID
 		__android_log_print( ANDROID_LOG_INFO, "JniANPR", "%s\n", p );
-
 #endif
 		return n;
 	}
