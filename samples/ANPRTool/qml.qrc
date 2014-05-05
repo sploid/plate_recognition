@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>settings.ico</file>
+        <file>camera.ico</file>
+    </qresource>
+</RCC>
