@@ -83,3 +83,50 @@ private:
 	const int64 m_begin;
 };
 
+inline QImage mat2qimage( const cv::Mat& mat )
+{
+	using namespace cv;
+	const int height = mat.rows;
+	const int width = mat.cols;
+	if ( mat.depth() == CV_MAT_DEPTH( CV_8U ) && mat.channels() == 3 )
+	{
+		const QImage ret( static_cast<const uchar*>( mat.ptr() ), width, height, QImage::Format_RGB888 );
+		return ret.rgbSwapped();
+	}
+	else if ( mat.depth() == CV_MAT_DEPTH( CV_8U ) && mat.channels() == 1 )
+	{
+		QImage ret( width, height, QImage::Format_RGB32 );
+		for( int nn = 0; nn < height; ++nn )
+		{
+			for ( int mm = 0; mm < width; ++mm )
+			{
+				const unsigned char next_pixel = static_cast< int >( mat.at< unsigned char >( nn, mm ) );
+				ret.setPixel( mm, nn, qRgb( next_pixel, next_pixel, next_pixel ) );
+			}
+		}
+		return ret;
+	}
+	else if ( mat.depth() == CV_MAT_DEPTH( CV_32F ) && mat.channels() == 1 )
+	{
+		Q_ASSERT( !"I doubt that it works" );
+		QImage ret( width, height, QImage::Format_Indexed8 );
+		QVector< QRgb > colorTable;
+		for ( int i = 0; i < 256; ++i )
+		{
+			colorTable.push_back( qRgb( i, i, i ) );
+		}
+		ret.setColorTable( colorTable );
+		for( int nn = 0; nn < height; ++nn )
+		{
+			for ( int mm = 0; mm < width; ++mm )
+			{
+				const int next_pixel = static_cast< int >( mat.at< float >( nn, mm ) );
+				ret.setPixel( mm, nn, next_pixel );
+			}
+		}
+		return ret;
+	}
+	Q_ASSERT( !"not supported format" );
+	return QImage();
+}
+

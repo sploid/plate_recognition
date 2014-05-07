@@ -6,6 +6,7 @@ plate_recognition.sln
 plate_recognition.*.suo
 
 auto_test_desktop/auto_test_desktop.vcxproj*
+auto_test_desktop/auto_test_desktop.pro.user*
 auto_test_desktop/debug
 auto_test_desktop/release
 
@@ -21,4 +22,6 @@ qt_gui_test/ui_recog_test.h
 train_neural_network/train_neural_network.vcxproj*
 train_neural_network/debug
 train_neural_network/release
+
+samples/ANPRTool/ANPRTool.pro.user*
 

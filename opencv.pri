@@ -2,11 +2,11 @@
 # путь к библиотеке OpenCV
 win32 {
 	OPENCV_DIR = C:/soft/opencv427/opencv/build
-} android { # windows from OpenCV NVidia pack
-	OPENCV_DIR = C:\soft\OpenCV-2.4.8-android-sdk\sdk\native
+} android {
+	OPENCV_DIR = C:\soft\OpenCV-2.4.9-android-sdk\sdk\native
 }
 # версия библиотеки OpenCV
-OPENCV_VER = 248
+OPENCV_VER = 249
 #==============================================================================
 
 win32 {
@@ -82,14 +82,15 @@ win32 {
 		INCLUDEPATH += $${OPENCV_DIR}/jni/include
 		LIBS += -L$${OPENCV_DIR}/libs/armeabi-v7a \
 				-L$${OPENCV_DIR}/3rdparty/libs/armeabi-v7a \
-				-lopencv_imgproc \
-				-lopencv_highgui \
 				-lopencv_ml \
-				-lopencv_features2d \
-				-lopencv_objdetect \
-				-lopencv_ts \
-				-lopencv_contrib \
-				-lopencv_calib3d \
+#				-lopencv_features2d \
+#				-lopencv_objdetect \
+#				-lopencv_ts \
+#				-lopencv_contrib \
+#				-lopencv_calib3d \
+				-lopencv_highgui \
+				-lopencv_androidcamera \
+				-lopencv_imgproc \
 				-lopencv_core \
 				-ltbb \
 				-llibjasper \

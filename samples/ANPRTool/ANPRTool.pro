@@ -1,6 +1,6 @@
 TEMPLATE = app
 
-QT += qml quick sensors
+QT += qml quick sensors multimedia
 
 SOURCES += \
 	main.cpp \
@@ -19,30 +19,11 @@ HEADERS += \
 	
 include(../../opencv.pri)
 
-OPENCV_DIR = C:\soft\OpenCV-2.4.9-android-sdk\sdk\native
-
-	CONFIG += mobility
-	equals(ANDROID_TARGET_ARCH, armeabi-v7a) {
-		INCLUDEPATH += $${OPENCV_DIR}/jni/include
-		LIBS += -L$${OPENCV_DIR}/libs/armeabi-v7a \
-				-L$${OPENCV_DIR}/3rdparty/libs/armeabi-v7a \
-#				-lopencv_ml \
-#				-lopencv_features2d \
-#				-lopencv_objdetect \
-#				-lopencv_ts \
-#				-lopencv_contrib \
-#				-lopencv_calib3d \
-				-lopencv_highgui \
-				-lopencv_androidcamera \
-				-lopencv_imgproc \
-				-lopencv_core \
-				-ltbb \
-				-llibjasper \
-				-llibpng \
-				-llibjpeg \
-				-llibtiff \
-				-lIlmImf
-	}
+# Dependencies for camera
+contains(ANDROID_TARGET_ARCH,armeabi-v7a) {
+    ANDROID_EXTRA_LIBS = \
+		$${OPENCV_DIR}/libs/armeabi-v7a/libnative_camera_r4.4.0.so
+}
 
 
 
