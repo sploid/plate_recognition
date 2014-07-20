@@ -5,6 +5,7 @@
 #include <QImage>
 
 class CvCapture;
+class QTimer;
 
 class CameraItem : public QQuickPaintedItem
 {
@@ -22,6 +23,7 @@ private Q_SLOTS:
 private:
 	CvCapture* m_capture;
 	QImage m_last_frame;
+	QTimer* m_timer;
 };
 
 #endif // CAMERAITEM_H
