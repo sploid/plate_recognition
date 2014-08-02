@@ -20,33 +20,39 @@ const int max_hidden_neuron = 25;
 
 vector< pair< char, Mat > > train_data( bool num )
 {
-	const string image_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../../train_data" ).toLocal8Bit() );
-
 	vector< pair< char, Mat > > ret;
-	QDir image_dir( image_folder.c_str() );
+	QDir image_dir( QCoreApplication::applicationDirPath() + "/../../train_data" );
 	if ( image_dir.exists() )
 	{
-		QStringList filters;
+		QStringList dir_filter;
 		if ( num )
 		{
-			filters << "0*.png" << "1*.png" << "2*.png" << "3*.png" << "4*.png" << "5*.png" << "6*.png" << "7*.png" << "8*.png" << "9*.png";
+			dir_filter << "0" << "1" << "2" << "3" << "4" << "5" << "6" << "7" << "8" << "9";
 		}
 		else
 		{
-			filters << "A*.png" << "B*.png" << "C*.png" << "E*.png" << "H*.png" << "K*.png" << "M*.png" << "O*.png" << "P*.png" << "T*.png" << "X*.png" << "Y*.png";
+			dir_filter << "A" << "B" << "C" << "E" << "H" << "K" << "M" << "O" << "P" << "T" << "X" << "Y";
 		}
-		const QStringList all_files = image_dir.entryList( filters );
-		for ( int nn = 0; nn < all_files.size(); ++nn )
+		for ( QStringList::const_iterator it = dir_filter.constBegin(); it != dir_filter.constEnd(); ++it )
 		{
-			const QString& next_file_name = all_files.at( nn );
-			const Mat one_chan_gray = from_file_to_row( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() );
-			if ( !one_chan_gray.empty() )
+			if ( image_dir.cd( *it ) )
 			{
-				ret.push_back( make_pair( next_file_name.toLocal8Bit().data()[ 0 ], one_chan_gray ) );
-			}
-			else
-			{
-				cout << "invalid image format: " << next_file_name.toLocal8Bit().data();
+				const QStringList all_files = image_dir.entryList( QStringList() << "*.png" );
+				for ( int nn = 0; nn < all_files.size(); ++nn )
+				{
+					const QString& next_file_name = all_files.at( nn );
+					const Mat one_chan_gray = from_file_to_row( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() );
+					if ( !one_chan_gray.empty() )
+					{
+						ret.push_back( make_pair( it->toLocal8Bit()[0], one_chan_gray ) );
+					}
+					else
+					{
+						cout << "invalid image format: " << next_file_name.toLocal8Bit().data();
+					}
+				}
+
+				image_dir.cdUp();
 			}
 		}
 	}
