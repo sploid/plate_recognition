@@ -83,6 +83,7 @@ private:
 	const int64 m_begin;
 };
 
+#ifdef QT_GUI
 inline QImage mat2qimage( const cv::Mat& mat, const QRect& rect = QRect() )
 {
 	using namespace cv;
@@ -138,4 +139,4 @@ inline QImage mat2qimage( const cv::Mat& mat, const QRect& rect = QRect() )
 	Q_ASSERT( !"not supported format" );
 	return QImage();
 }
-
+#endif
