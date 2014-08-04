@@ -16,7 +16,8 @@
 using namespace std;
 using namespace cv;
 
-const int max_hidden_neuron = 25;
+const int max_hidden_neuron = 40;
+const int min_hidden_neuron = 20;
 
 vector< pair< char, Mat > > train_data( bool num )
 {
@@ -186,7 +187,7 @@ float evaluate( const Mat& output, int output_row, const Mat& pred_out )
 
 void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_index, int count_hidden )
 {
-	for ( int nn = layer_sizes.at< int >( layer_sizes.cols - 1 ); nn <= max_hidden_neuron; ++nn )
+	for ( int nn = min_hidden_neuron; nn <= max_hidden_neuron; ++nn )
 	{
 		layer_sizes.at< int >( layer_index + 1 ) = nn;
 		if ( layer_index == count_hidden - 1 )
