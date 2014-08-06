@@ -49,7 +49,7 @@ private:
 		const QString file_name_ext( fi.suffix() );
 		const QString file_number( fi.baseName() );
 		string number_to_out( "[" );
-		number_to_out += file_number.toLocal8Bit() + "](test_data/" + file_name_ext.toLocal8Bit() + ")";
+		number_to_out += file_number.toLocal8Bit() + "](test_data/" + fi.fileName().toLocal8Bit() + ")";
 		to_out << setw( 37 ) << setfill( ' ' ) << number_to_out << "|";
 		const cv::Mat image = cv::imread( m_file_name.toLocal8Bit().data(), CV_LOAD_IMAGE_COLOR );   // Read the file
 		stringstream size_stream;
@@ -79,7 +79,7 @@ private:
 		}
 		static QMutex out_locker;
 		QMutexLocker lock( &out_locker );
-		cout << to_out.str().c_str();
+		cout << to_out.str().c_str() << endl;
 		m_sum += sum;
 	}
 
@@ -90,8 +90,8 @@ private:
 class work_thread : public QThread
 {
 public:
-	work_thread( const QString& image_folder )
-		: m_image_folder( image_folder )
+	work_thread( const QString& image_or_folder )
+		: m_image_or_folder( image_or_folder )
 	{
 	}
 
@@ -103,26 +103,36 @@ protected:
 		try
 		{
 			init_recognizer();
+			QThreadPool::globalInstance()->setMaxThreadCount( 2 ); // тут минимум 2, т.к. если будет 1, то потоки обработки не будут запускаться
 			const int64 begin = cv::getTickCount();
-			// грузим список картинок
-
-			QDir image_dir( m_image_folder );
-			if ( image_dir.exists() )
+			const QFileInfo fi( m_image_or_folder );
+			if ( fi.exists() )
 			{
-				to_out << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
-				const QStringList all_files = image_dir.entryList( QStringList() << "*.*", QDir::Files|QDir::Readable );
-				QThreadPool::globalInstance()->setMaxThreadCount( 2 ); // тут минимум 2, т.к. если будет 1, то потоки обработки не будут запускаться
-				for ( int nn = 0; nn < all_files.size(); ++nn )
+				if ( fi.isFile() )
 				{
-					const QString next_file_name = m_image_folder + "/" + all_files.at( nn );
-					QThreadPool::globalInstance()->start( new process_file_task( m_image_folder, next_file_name ) );
+					QString ss =fi.absolutePath();
+					QThreadPool::globalInstance()->start( new process_file_task( fi.absolutePath(), fi.absoluteFilePath() ) );
+				}
+				else
+				{
+					// грузим список картинок
+					QDir image_dir( fi.absoluteFilePath() );
+					if ( image_dir.exists() )
+					{
+						const QStringList all_files = image_dir.entryList( QStringList() << "*.*", QDir::Files|QDir::Readable );
+						for ( int nn = 0; nn < all_files.size(); ++nn )
+						{
+							const QString next_file_name = image_dir.absolutePath() + "/" + all_files.at( nn );
+							QThreadPool::globalInstance()->start( new process_file_task( image_dir.absolutePath(), next_file_name ) );
+						}
+					}
 				}
 				QThreadPool::globalInstance()->waitForDone();
 				to_out << "sum: " << process_file_task::m_sum << " " << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << endl;
 			}
 			else
 			{
-				to_out << "Error, folder not exists";
+				to_out << "Error, folder or file not exists";
 			}
 		}
 		catch ( const std::exception& e )
@@ -132,7 +142,7 @@ protected:
 		cout << to_out.str().c_str();
 	}
 private:
-	const QString m_image_folder;
+	const QString m_image_or_folder;
 };
 
 int process_file_task::m_sum = 0;
@@ -143,8 +153,7 @@ void print_help()
 	cout << "Plate number recognition" << endl;
 	cout << "Usage: auto_test_desktop -i input [-oi out_im] [-os out_sym]" << endl << endl;
 	cout << "Flags:" << endl;
-	cout << "-i      sets folder with pictures for recognition" << endl;
-//	cout << "-i      sets or folder with pictures or a single file for recognition" << endl;
+	cout << "-i      sets or folder with pictures or a single file for recognition" << endl;
 //	cout << "-oi     specifies the target folder for pictures with the result" << endl;
 //	cout << "-os     specifies the target folder for storing intermediate symbols" << endl << endl;
 }
@@ -185,14 +194,14 @@ int main( int argc, char** argv )
 		print_help();
 		return 1;
 	}
-	const QString image_folder = get_flag_value( "-i" );
-	if ( image_folder.isEmpty() )
+	const QString image_or_folder = get_flag_value( "-i" );
+	if ( image_or_folder.isEmpty() )
 	{
 		cout << "Invalid arguments" << endl << endl;
 		print_help();
 		return 1;
 	}
-	work_thread wt( image_folder );
+	work_thread wt( image_or_folder );
 	a.connect( &wt, SIGNAL( finished() ), SLOT( quit() ) );
 	wt.start();
 	const int ret = a.exec();
