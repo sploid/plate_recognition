@@ -3,7 +3,6 @@ TEMPLATE = subdirs
 SUBDIRS = \
 		plate_recog_lib \
 		auto_test_desktop \
-		qt_gui_test \
 		train_neural_network
 
 auto_test_desktop.depends = plate_recog_lib

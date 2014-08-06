@@ -10,14 +10,17 @@
 #pragma warning( push )
 #pragma warning( disable : 4127 4512 4244 4251 4800 )
 #endif
+#include <QCoreApplication>
 #include <QDir>
-#include <QApplication>
 #include <QThreadPool>
 #include <QMutex>
 #include <QDebug>
 #include <QTemporaryFile>
+#ifdef QT_GUI_LIB
+#include <QApplication>
 #include <QDialog>
 #include <QPushButton>
+#endif // QT_GUI_LIB
 #ifdef _MSC_VER
 #pragma warning( pop )
 #endif
@@ -27,7 +30,7 @@
 class process_file_task : public QRunnable
 {
 public:
-	process_file_task( const std::string& folder_name, const std::string& file_name )
+	process_file_task( const QString& folder_name, const QString& file_name )
 		: m_folder_name( folder_name )
 		, m_file_name( file_name )
 	{
@@ -42,12 +45,13 @@ private:
 	{
 		using namespace std;
 		stringstream to_out;
-		const string file_name_ext( m_file_name.substr( m_folder_name.size() + 1, m_file_name.size() - m_folder_name.size() - 1 ) );
-		const string file_number( file_name_ext.substr( 0, file_name_ext.size() - 4 ) );
+		const QFileInfo fi( m_file_name );
+		const QString file_name_ext( fi.suffix() );
+		const QString file_number( fi.baseName() );
 		string number_to_out( "[" );
-		number_to_out += file_number + "](test_data/" + file_name_ext + ")";
+		number_to_out += file_number.toLocal8Bit() + "](test_data/" + file_name_ext.toLocal8Bit() + ")";
 		to_out << setw( 37 ) << setfill( ' ' ) << number_to_out << "|";
-		const cv::Mat image = cv::imread( m_file_name.c_str(), CV_LOAD_IMAGE_COLOR );   // Read the file
+		const cv::Mat image = cv::imread( m_file_name.toLocal8Bit().data(), CV_LOAD_IMAGE_COLOR );   // Read the file
 		stringstream size_stream;
 		size_stream << image.rows << "x" << image.cols;
 		to_out << setw( 9 ) << setfill( ' ' ) << size_stream.str() << "|";
@@ -56,7 +60,7 @@ private:
 		{
 			const int64 begin = cv::getTickCount();
 			const pair< string, int > number = read_number( image, 10 );
-			if ( file_number != number.first )
+			if ( file_number.toLocal8Bit().data() != number.first )
 			{
 
 				to_out << setw( 13 ) << setfill( ' ' ) << ( string( "~~" ) + number.first + "~~" );
@@ -71,22 +75,22 @@ private:
 		}
 		else
 		{
-			to_out << "FAILED READ FILE: " << QFile::exists( m_file_name.c_str() ) << " " << m_file_name.c_str();
+			to_out << "FAILED READ FILE: " << QFile::exists( m_file_name ) << " " << m_file_name.toLocal8Bit().data();
 		}
 		static QMutex out_locker;
 		QMutexLocker lock( &out_locker );
-		cout << to_out.str();
+		cout << to_out.str().c_str();
 		m_sum += sum;
 	}
 
-	const std::string m_folder_name;
-	const std::string m_file_name;
+	const QString m_folder_name;
+	const QString m_file_name;
 };
 
 class work_thread : public QThread
 {
 public:
-	work_thread( const std::string& image_folder )
+	work_thread( const QString& image_folder )
 		: m_image_folder( image_folder )
 	{
 	}
@@ -102,7 +106,7 @@ protected:
 			const int64 begin = cv::getTickCount();
 			// грузим список картинок
 
-			QDir image_dir( m_image_folder.c_str() );
+			QDir image_dir( m_image_folder );
 			if ( image_dir.exists() )
 			{
 				to_out << "\"file\"  \"number\"  \"weight\"  \"time\"" << endl;
@@ -110,7 +114,7 @@ protected:
 				QThreadPool::globalInstance()->setMaxThreadCount( 2 ); // тут минимум 2, т.к. если будет 1, то потоки обработки не будут запускаться
 				for ( int nn = 0; nn < all_files.size(); ++nn )
 				{
-					const string next_file_name = QDir::toNativeSeparators( QString::fromLocal8Bit( m_image_folder.c_str() ) + "/" + all_files.at( nn ) ).toLocal8Bit().data();
+					const QString next_file_name = m_image_folder + "/" + all_files.at( nn );
 					QThreadPool::globalInstance()->start( new process_file_task( m_image_folder, next_file_name ) );
 				}
 				QThreadPool::globalInstance()->waitForDone();
@@ -125,31 +129,43 @@ protected:
 		{
 			to_out << "Catch exeption, what: " << e.what();
 		}
-		cout << to_out.str();
+		cout << to_out.str().c_str();
 	}
 private:
-	const std::string m_image_folder;
+	const QString m_image_folder;
 };
 
 int process_file_task::m_sum = 0;
 
+void print_help()
+{
+	using namespace std;
+	cout << "Plate number recognition" << endl;
+	cout << "Usage: auto_test_desktop -i input [-oi out_im] [-os out_sym]" << endl << endl;
+	cout << "Flags:" << endl;
+	cout << "-i      sets folder with pictures for recognition" << endl;
+//	cout << "-i      sets or folder with pictures or a single file for recognition" << endl;
+//	cout << "-oi     specifies the target folder for pictures with the result" << endl;
+//	cout << "-os     specifies the target folder for storing intermediate symbols" << endl << endl;
+}
+
+QString get_flag_value( const QString& key )
+{
+	const QStringList args = QCoreApplication::arguments();
+	const int index_key = args.indexOf( key );
+	return index_key != -1 && args.size() > index_key + 1 ? args[ index_key + 1 ] : "";
+}
+
+// TODO: Переписать вывод в классе process_file_task
 int main( int argc, char** argv )
 {
 	using namespace std;
+#ifdef ANDROID
 	QApplication a( argc, argv );
 	std_cout_2_qdebug cc;
 	(void)cc;
 
-#ifndef ANDROID // for android hardcode image folder
-	if ( argc <= 1 )
-	{
-		cout << "usage: auto_test_desktop image_folder";
-		return 1;
-	}
-	const string image_folder( argv[ 1 ] );
-#else
 	const string image_folder( "/storage/sdcard0/test_data" );
-#endif // ANDROID
 
 	QDialog *dlg = new QDialog();
 	QPushButton* btn = new QPushButton( "WAIT", dlg );
@@ -161,4 +177,26 @@ int main( int argc, char** argv )
 	const int ret = a.exec();
 	wt.wait();
 	return ret;
+#else
+	QCoreApplication a( argc, argv );
+	const QStringList app_args = QCoreApplication::arguments();
+	if ( app_args.indexOf( "-h" ) != -1 || app_args.indexOf( "-help" ) != -1 || app_args.indexOf( "--help" ) != -1 || app_args.indexOf( "/?" ) != -1 )
+	{
+		print_help();
+		return 1;
+	}
+	const QString image_folder = get_flag_value( "-i" );
+	if ( image_folder.isEmpty() )
+	{
+		cout << "Invalid arguments" << endl << endl;
+		print_help();
+		return 1;
+	}
+	work_thread wt( image_folder );
+	a.connect( &wt, SIGNAL( finished() ), SLOT( quit() ) );
+	wt.start();
+	const int ret = a.exec();
+	wt.wait();
+	return ret;
+#endif // QT_GUI_LIB
 }

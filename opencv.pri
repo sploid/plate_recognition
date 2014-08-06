@@ -6,7 +6,7 @@ win32 {
 	OPENCV_DIR = C:\soft\OpenCV-2.4.9-android-sdk\sdk\native
 }
 # версия библиотеки OpenCV
-OPENCV_VER = 249
+OPENCV_VER = 247
 #==============================================================================
 
 win32 {
