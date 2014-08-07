@@ -1,8 +1,8 @@
 #include "sym_recog.h"
 #include <stdexcept>
+#include <fstream>
 #include <opencv2/opencv.hpp>
 #include "utils.h"
-#include "syms.h"
 #include "figure.h"
 
 #include "neural_net_char.cpp"
@@ -179,10 +179,11 @@ std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& ml
 	mlp.predict( convert_to_row( input ), pred_out );
 	const int max_val = search_max_val( pred_out );
 	const pair< char, double > ret = make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
-	if ( ret.first >= '7' && ret.first <= '7' )
+	imwrite( next_name( string( "" ) + ret.first ), input );
+/*	if ( ret.first >= '7' && ret.first <= '7' )
 	{
-//		imwrite( next_name( string( "sym" ) + ret.first ), input );
-	}
+		imwrite( next_name( string( "sym" ) + ret.first ), input );
+	}*/
 	return ret;
 }
 
@@ -195,8 +196,6 @@ std::pair< char, double > proc_num( const cv::Mat& input )
 {
 	return proc_impl( input, aux::mlp_num, &index_to_char_num );
 }
-
-#include <fstream>
 
 void init_nn( NeuralNet_MLP& mlp, const string& data )
 {

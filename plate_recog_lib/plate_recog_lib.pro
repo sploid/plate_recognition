@@ -13,11 +13,9 @@ HEADERS = \
 		engine.h \
 		figure.h \
 		sym_recog.h \
-		syms.h \
 		utils.h
 SOURCES = \
 		engine.cpp \
-		syms.cpp \
 		sym_recog.cpp
 
 include(../opencv.pri)

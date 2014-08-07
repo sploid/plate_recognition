@@ -2,7 +2,6 @@
 #include <opencv2/opencv.hpp>
 #include <assert.h>
 #include <stdexcept>
-#include "syms.h"
 #include "sym_recog.h"
 #include "utils.h"
 #include "figure.h"
