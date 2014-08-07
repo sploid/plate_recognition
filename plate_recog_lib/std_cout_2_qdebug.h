@@ -43,6 +43,7 @@ protected:
 
 	virtual std::streamsize xsputn( const char *p, std::streamsize n )
 	{
+		(void)p;
 #ifdef QT
 		qDebug() << QString::fromLocal8Bit( p, static_cast< int >( n ) );
 #elif defined ANDROID

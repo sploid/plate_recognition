@@ -10,51 +10,6 @@
 using namespace cv;
 using namespace std;
 
-
-// найденный номер
-struct found_number
-{
-	found_number()
-		: m_number( string() )
-		, m_weight( -1 )
-	{
-	}
-	string m_number;		// номер
-	int m_weight;			// вес
-	vector< figure > m_figs;
-
-	pair< string, int > to_pair() const
-	{
-		return make_pair( m_number, m_weight );
-	}
-
-	bool operator < ( const found_number& other ) const
-	{
-		const int cnp = count_not_parsed_syms();
-		const int cnp_other = other.count_not_parsed_syms();
-		if ( cnp != cnp_other )
-		{
-			return cnp > cnp_other;
-		}
-		else
-		{
-			return m_weight < other.m_weight;
-		}
-	}
-
-	bool is_valid() const
-	{
-		return m_weight != -1 && !m_number.empty();
-	}
-
-	int count_not_parsed_syms() const
-	{
-		if ( m_number.empty() )
-			return 100; // вообще ничего нет
-		return count( m_number.begin(), m_number.end(), '?' );
-	}
-};
-
 struct number_data
 {
 	number_data()
@@ -136,7 +91,7 @@ void set_free_index( int index )
 
 #endif // _WIN32
 
-pair< string, int > read_number_loop( const Mat& input, const vector< int >& search_levels );
+found_number read_number_loop( const Mat& input, const vector< int >& search_levels );
 
 inline pair_int operator - ( const pair_int& lh, const pair_int& rh )
 {
@@ -1150,7 +1105,7 @@ void search_region( found_number& best_number, const int best_level, const Mat& 
 
 }
 
-pair< string, int > read_number( const Mat& image, int gray_step )
+found_number read_number( const Mat& image, int gray_step )
 {
 	if ( gray_step <= 0 || gray_step >= 256 )
 		gray_step = 10;
@@ -1164,7 +1119,7 @@ pair< string, int > read_number( const Mat& image, int gray_step )
 	return read_number_loop( image, search_levels );
 }
 
-pair< string, int > read_number_by_level( const Mat& image, int gray_level )
+found_number read_number_by_level( const Mat& image, int gray_level )
 {
 	vector< int > search_levels;
 	if ( gray_level <= 0 || gray_level >= 256 )
@@ -1230,9 +1185,9 @@ vector< found_number > read_number_impl( const Mat& input, int gray_level, numbe
 	return nums;
 }
 
-pair< string, int > read_number_loop( const Mat& input, const vector< int >& search_levels )
+found_number read_number_loop( const Mat& input, const vector< int >& search_levels )
 {
-	pair< string, int > ret( make_pair( string(), 0 ) );
+	found_number ret;
 	const int free_index = get_free_index();
 	try
 	{
@@ -1317,18 +1272,7 @@ pair< string, int > read_number_loop( const Mat& input, const vector< int >& sea
 				throw runtime_error( "invalid data index" );
 			};
 
-			// рисуем квадрат номера
-/*			Mat num_rect_image = input.clone();
-			for ( size_t nn = 0; nn < best_number.m_figs.size(); ++nn )
-			{
-				const figure& cur_fig = best_number.m_figs[ nn ];
-				rectangle( num_rect_image, Point( cur_fig.left(), cur_fig.top() ), Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
-			}*/
-
-//			imwrite( next_name( "etal" ), num_rect_image );
-//			imwrite( next_name( "binary" ), gray_image > search_levels.at( best_index ) );
-
-			ret = best_number.to_pair();
+			ret = best_number;
 		}
 	}
 	catch ( const cv::Exception& )
