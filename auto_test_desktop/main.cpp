@@ -29,6 +29,8 @@
 
 const std::string key_input_folder( "-i" );
 const std::string key_output_folder( "-oi" );
+const std::string key_output_symbols( "-os" );
+
 QString get_flag_value( const std::string& key )
 {
 	const QStringList args = QCoreApplication::arguments();
@@ -178,7 +180,52 @@ void print_help()
 	cout << "Flags:" << endl;
 	cout << key_input_folder << "      sets or folder with pictures or a single file for recognition" << endl;
 	cout << key_output_folder << "     specifies the target folder for pictures with the result" << endl;
-//	cout << "-os     specifies the target folder for storing intermediate symbols" << endl << endl;
+	cout << key_output_symbols << "     specifies the target folder for storing intermediate symbols" << endl << endl;
+}
+
+bool validate_sym_folders_exists( const QString& output_symbol_folder )
+{
+	QDir dir( output_symbol_folder );
+	if ( !dir.exists() )
+	{
+		// output folder not exists
+		return false;
+	}
+
+	std::vector< char > all_syms = all_symbols();
+	for ( size_t nn = 0; nn < all_syms.size(); ++nn )
+	{
+		const QString next_sym_dir( all_syms[ nn ] );
+		if ( !dir.exists( next_sym_dir )
+			&& !dir.mkdir( next_sym_dir ) )
+		{
+			// failed create sym folder
+			return false;
+		}
+		if ( !dir.cd( next_sym_dir ) )
+		{
+			// failed cd in sym folder
+			return false;
+		}
+		const QFileInfoList all_files = dir.entryInfoList( QStringList() << "*.png" );
+		for ( int nn = 0; nn < all_files.size(); ++nn )
+		{
+			const QString next_file_name( all_files[ nn ].absoluteFilePath() );
+			if ( QFile::exists( next_file_name )
+				&& !QFile::remove( next_file_name ) )
+			{
+				// failed remove symbol file
+				return false;
+			}
+		}
+		if ( !dir.cdUp() )
+		{
+			// failed cd to sym root folder
+			return false;
+		}
+	}
+
+	return true;
 }
 
 // @todo: Переписать вывод в классе process_file_task
@@ -216,6 +263,16 @@ int main( int argc, char** argv )
 		cout << "Invalid arguments" << endl << endl;
 		print_help();
 		return 1;
+	}
+	const QString output_symbol_folder( get_flag_value( key_output_symbols ) );
+	if ( !output_symbol_folder.isEmpty() )
+	{
+		if ( !validate_sym_folders_exists( output_symbol_folder ) )
+		{
+			cout << "Failed create folders for output symbols" << endl << endl;
+			return 1;
+		}
+		set_output_symbol_folder( output_symbol_folder.toLocal8Bit().data() );
 	}
 	work_thread wt( image_or_folder );
 	a.connect( &wt, SIGNAL( finished() ), SLOT( quit() ) );

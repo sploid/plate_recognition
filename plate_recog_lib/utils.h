@@ -19,7 +19,7 @@ inline std::string next_name( const std::string& key, const std::string& ext = "
 #ifdef ANDROID
 	ss << "/storage/sdcard0/imgs/" << key << "_" << it->second++ << "." << ext;
 #else
-	ss << "C:\\imgs\\debug\\" << key << "_" << it->second++ << "." << ext;
+	ss << key << it->second++ << "." << ext;
 #endif
 	return ss.str();
 }

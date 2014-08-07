@@ -15,7 +15,13 @@ namespace { namespace aux {
 	NeuralNet_MLP mlp_char;
 	NeuralNet_MLP mlp_num;
 	static set< string > g_region_codes;
+	static string g_output_symbol_folder;
 } }
+
+void set_output_symbol_folder( const std::string& folder )
+{
+	aux::g_output_symbol_folder = folder;
+}
 
 int search_max_val( const cv::Mat& data, int row )
 {
@@ -152,6 +158,34 @@ char index_to_char_char( int index )
 	}
 }
 
+std::vector< char > all_symbols()
+{
+	vector< char > ret;
+	ret.push_back( '0' );
+	ret.push_back( '1' );
+	ret.push_back( '2' );
+	ret.push_back( '3' );
+	ret.push_back( '4' );
+	ret.push_back( '5' );
+	ret.push_back( '6' );
+	ret.push_back( '7' );
+	ret.push_back( '8' );
+	ret.push_back( '9' );
+	ret.push_back( 'A' );
+	ret.push_back( 'B' );
+	ret.push_back( 'C' );
+	ret.push_back( 'E' );
+	ret.push_back( 'H' );
+	ret.push_back( 'K' );
+	ret.push_back( 'M' );
+	ret.push_back( 'O' );
+	ret.push_back( 'P' );
+	ret.push_back( 'T' );
+	ret.push_back( 'X' );
+	ret.push_back( 'Y' );
+	return ret;
+}
+
 typedef char (*index_to_char_func)( int );
 
 double predict_min_diff( const cv::Mat& pred_out, int max_val )
@@ -179,11 +213,11 @@ std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& ml
 	mlp.predict( convert_to_row( input ), pred_out );
 	const int max_val = search_max_val( pred_out );
 	const pair< char, double > ret = make_pair( i2c( max_val ), predict_min_diff( pred_out, max_val ) );
-	imwrite( next_name( string( "" ) + ret.first ), input );
-/*	if ( ret.first >= '7' && ret.first <= '7' )
+	if ( !aux::g_output_symbol_folder.empty() )
 	{
-		imwrite( next_name( string( "sym" ) + ret.first ), input );
-	}*/
+		const std::string next_file_name( next_name( aux::g_output_symbol_folder + "/" + ret.first + "/" ) );
+		imwrite( next_file_name, input );
+	}
 	return ret;
 }
 
