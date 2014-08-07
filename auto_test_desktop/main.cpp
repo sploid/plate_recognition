@@ -27,12 +27,22 @@
 
 #include "sym_recog.h"
 
+const std::string key_input_folder( "-i" );
+const std::string key_output_folder( "-oi" );
+QString get_flag_value( const std::string& key )
+{
+	const QStringList args = QCoreApplication::arguments();
+	const int index_key = args.indexOf( key.c_str() );
+	return index_key != -1 && args.size() > index_key + 1 ? args[ index_key + 1 ] : "";
+}
+
 class process_file_task : public QRunnable
 {
 public:
 	process_file_task( const QString& folder_name, const QString& file_name )
 		: m_folder_name( folder_name )
 		, m_file_name( file_name )
+		, m_output_folder_name( get_flag_value( key_output_folder ) )
 	{
 	}
 
@@ -59,19 +69,31 @@ private:
 		if( image.data )
 		{
 			const int64 begin = cv::getTickCount();
-			const pair< string, int > number = read_number( image, 10 );
-			if ( file_number.toLocal8Bit().data() != number.first )
+			const found_number number = read_number( image, 10 );
+			if ( !m_output_folder_name.isEmpty() && QDir( m_output_folder_name ).exists() && !number.m_number.empty() )
+			{
+				// рисуем квадрат номера
+				cv::Mat num_rect_image = image.clone();
+				for ( size_t nn = 0; nn < number.m_figs.size(); ++nn )
+				{
+					const figure& cur_fig = number.m_figs[ nn ];
+					cv::rectangle( num_rect_image, cv::Point( cur_fig.left(), cur_fig.top() ), cv::Point( cur_fig.right(), cur_fig.bottom() ), CV_RGB( 0, 255, 0 ) );
+				}
+				cv::imwrite( ( m_output_folder_name + "/" + fi.baseName() + "_out.png" ).toLocal8Bit().data(), num_rect_image );
+			}
+
+			if ( file_number.toLocal8Bit().data() != number.m_number )
 			{
 
-				to_out << setw( 13 ) << setfill( ' ' ) << ( string( "~~" ) + number.first + "~~" );
+				to_out << setw( 13 ) << setfill( ' ' ) << ( string( "~~" ) + number.m_number + "~~" );
 			}
 			else
 			{
-				to_out << setw( 13 ) << setfill( ' ' ) << number.first;
+				to_out << setw( 13 ) << setfill( ' ' ) << number.m_number;
 			}
-			to_out << " - "  << setw( 8 ) << setfill( ' ' ) << setprecision( 5 ) << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << "|" << number.second << "   ";
+			to_out << " - "  << setw( 8 ) << setfill( ' ' ) << setprecision( 5 ) << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << "|" << number.m_weight << "   ";
 			to_out << endl;
-			sum = number.second;
+			sum = number.m_weight;
 		}
 		else
 		{
@@ -85,6 +107,7 @@ private:
 
 	const QString m_folder_name;
 	const QString m_file_name;
+	const QString m_output_folder_name;
 };
 
 class work_thread : public QThread
@@ -151,21 +174,14 @@ void print_help()
 {
 	using namespace std;
 	cout << "Plate number recognition" << endl;
-	cout << "Usage: auto_test_desktop -i input [-oi out_im] [-os out_sym]" << endl << endl;
+	cout << "Usage: auto_test_desktop " << key_input_folder << " input [" << key_output_folder << " out_im] [-os out_sym]" << endl << endl;
 	cout << "Flags:" << endl;
-	cout << "-i      sets or folder with pictures or a single file for recognition" << endl;
-//	cout << "-oi     specifies the target folder for pictures with the result" << endl;
+	cout << key_input_folder << "      sets or folder with pictures or a single file for recognition" << endl;
+	cout << key_output_folder << "     specifies the target folder for pictures with the result" << endl;
 //	cout << "-os     specifies the target folder for storing intermediate symbols" << endl << endl;
 }
 
-QString get_flag_value( const QString& key )
-{
-	const QStringList args = QCoreApplication::arguments();
-	const int index_key = args.indexOf( key );
-	return index_key != -1 && args.size() > index_key + 1 ? args[ index_key + 1 ] : "";
-}
-
-// TODO: Переписать вывод в классе process_file_task
+// @todo: Переписать вывод в классе process_file_task
 int main( int argc, char** argv )
 {
 	using namespace std;
@@ -194,7 +210,7 @@ int main( int argc, char** argv )
 		print_help();
 		return 1;
 	}
-	const QString image_or_folder = get_flag_value( "-i" );
+	const QString image_or_folder = get_flag_value( key_input_folder );
 	if ( image_or_folder.isEmpty() )
 	{
 		cout << "Invalid arguments" << endl << endl;
