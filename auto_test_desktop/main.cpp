@@ -30,12 +30,19 @@
 const std::string key_input_folder( "-i" );
 const std::string key_output_folder( "-oi" );
 const std::string key_output_symbols( "-os" );
+const std::string key_output_number( "-on" );
 
 QString get_flag_value( const std::string& key )
 {
 	const QStringList args = QCoreApplication::arguments();
 	const int index_key = args.indexOf( key.c_str() );
 	return index_key != -1 && args.size() > index_key + 1 ? args[ index_key + 1 ] : "";
+}
+
+bool is_flag_exists( const std::string& key )
+{
+	const QStringList args = QCoreApplication::arguments();
+	return args.indexOf( key.c_str() ) != -1;
 }
 
 class process_file_task : public QRunnable
@@ -45,6 +52,7 @@ public:
 		: m_folder_name( folder_name )
 		, m_file_name( file_name )
 		, m_output_folder_name( get_flag_value( key_output_folder ) )
+		, m_output_number( is_flag_exists( key_output_number ) )
 	{
 	}
 
@@ -56,17 +64,17 @@ private:
 	void run()
 	{
 		using namespace std;
-		stringstream to_out;
+		stringstream to_out_full, to_out_number;
 		const QFileInfo fi( m_file_name );
 		const QString file_name_ext( fi.suffix() );
 		const QString file_number( fi.baseName() );
 		string number_to_out( "[" );
 		number_to_out += file_number.toLocal8Bit() + "](test_data/" + fi.fileName().toLocal8Bit() + ")";
-		to_out << setw( 37 ) << setfill( ' ' ) << number_to_out << "|";
+		to_out_full << setw( 37 ) << setfill( ' ' ) << number_to_out << "|";
 		const cv::Mat image = cv::imread( m_file_name.toLocal8Bit().data(), CV_LOAD_IMAGE_COLOR );   // Read the file
 		stringstream size_stream;
 		size_stream << image.rows << "x" << image.cols;
-		to_out << setw( 9 ) << setfill( ' ' ) << size_stream.str() << "|";
+		to_out_full << setw( 9 ) << setfill( ' ' ) << size_stream.str() << "|";
 		int sum = 0;
 		if( image.data )
 		{
@@ -84,32 +92,40 @@ private:
 				cv::imwrite( ( m_output_folder_name + "/" + fi.baseName() + "_out.png" ).toLocal8Bit().data(), num_rect_image );
 			}
 
+			to_out_number << number.m_number;
 			if ( file_number.toLocal8Bit().data() != number.m_number )
 			{
-
-				to_out << setw( 13 ) << setfill( ' ' ) << ( string( "~~" ) + number.m_number + "~~" );
+				to_out_full << setw( 13 ) << setfill( ' ' ) << ( string( "~~" ) + number.m_number + "~~" );
 			}
 			else
 			{
-				to_out << setw( 13 ) << setfill( ' ' ) << number.m_number;
+				to_out_full << setw( 13 ) << setfill( ' ' ) << number.m_number;
 			}
-			to_out << " - "  << setw( 8 ) << setfill( ' ' ) << setprecision( 5 ) << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << "|" << number.m_weight << "   ";
-			to_out << endl;
+			to_out_full << " - "  << setw( 8 ) << setfill( ' ' ) << setprecision( 5 ) << (((double)cv::getTickCount() - begin)/cv::getTickFrequency()) << "|" << number.m_weight << "   ";
+			to_out_full << endl;
 			sum = number.m_weight;
 		}
 		else
 		{
-			to_out << "FAILED READ FILE: " << QFile::exists( m_file_name ) << " " << m_file_name.toLocal8Bit().data();
+			to_out_full << "FAILED READ FILE: " << QFile::exists( m_file_name ) << " " << m_file_name.toLocal8Bit().data();
 		}
 		static QMutex out_locker;
 		QMutexLocker lock( &out_locker );
-		cout << to_out.str().c_str() << endl;
+		if ( m_output_number )
+		{
+			cout << to_out_number.str();
+		}
+		else
+		{
+			cout << to_out_full.str() << endl;
+		}
 		m_sum += sum;
 	}
 
 	const QString m_folder_name;
 	const QString m_file_name;
 	const QString m_output_folder_name;
+	const bool m_output_number;
 };
 
 class work_thread : public QThread
@@ -164,7 +180,10 @@ protected:
 		{
 			to_out << "Catch exeption, what: " << e.what();
 		}
-		cout << to_out.str().c_str();
+		if ( !is_flag_exists( key_output_number ) )
+		{
+			cout << to_out.str().c_str();
+		}
 	}
 private:
 	const QString m_image_or_folder;
@@ -180,7 +199,8 @@ void print_help()
 	cout << "Flags:" << endl;
 	cout << key_input_folder << "      sets or folder with pictures or a single file for recognition" << endl;
 	cout << key_output_folder << "     specifies the target folder for pictures with the result" << endl;
-	cout << key_output_symbols << "     specifies the target folder for storing intermediate symbols" << endl << endl;
+	cout << key_output_symbols << "     specifies the target folder for storing intermediate symbols" << endl;
+	cout << key_output_number << "     print only found number" << endl << endl;
 }
 
 bool validate_sym_folders_exists( const QString& output_symbol_folder )
