@@ -7,7 +7,7 @@ namespace cv
 {
 	class Mat;
 }
-class figure;
+class Figure;
 
 const int data_width = 15;
 const int data_height = 22;
@@ -24,7 +24,7 @@ std::pair< char, double > proc_num( const cv::Mat& input );
 // init recognizer
 void init_recognizer();
 // region codes
-const std::set< std::string >& region_codes();
+//const std::set< std::string >& region_codes();
 // set folder for output symbols
 void set_output_symbol_folder( const std::string& folder );
 // return all symbols

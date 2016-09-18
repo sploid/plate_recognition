@@ -1,9 +1,11 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <set>
+#include "figure.h"
 
-typedef std::pair< int, int > pair_int;
-typedef std::pair< double, double > pair_doub;
+typedef std::pair<int, int> pair_int;
+typedef std::pair<double, double> pair_doub;
 
 inline std::string next_name( const std::string& key, const std::string& ext = "png" )
 {
@@ -43,6 +45,28 @@ inline void draw_points( const std::vector< pair_int >& pis, const cv::Mat& etal
 		rectangle( colored_rect, Point( pis.at( mm ).first - 1, pis.at( mm ).second - 1 ), Point( pis.at( mm ).first + 1, pis.at( mm ).second + 1 ), CV_RGB( 0, 255, 0 ) );
 	}
 	imwrite( next_name( key ), colored_rect );
+}
+
+inline void DrawFigure(cv::Mat& output, const Figure& fig, const cv::Scalar& color) {
+  cv::rectangle(output, cv::Rect(cv::Point2i(fig.left(), fig.top()), cv::Point2i(fig.right(), fig.bottom())), color);
+}
+
+template<class TFigures>
+void DrawFigures(cv::Mat& output, const TFigures& figures, const cv::Scalar& color, bool connect_centers = false) {
+  for (const auto& next : figures) {
+    DrawFigure(output, next, color);
+    if (connect_centers) {
+      for (size_t nn = 0; nn < figures.size() - 1; ++nn) {
+        cv::line(output, figures.at(nn).CenterCV(), figures.at(nn + 1).CenterCV(), color, 2);
+      }
+    }
+  }
+}
+
+inline void DrawGroupsFigures(cv::Mat& output, const std::vector<FigureGroup>& groups, const cv::Scalar& color) {
+  for (const auto& next : groups) {
+    DrawFigures(output, next, color, true);
+  }
 }
 
 namespace cv

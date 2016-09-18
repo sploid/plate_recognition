@@ -10,7 +10,7 @@ OPENCV_VER = 247
 #==============================================================================
 
 win32 {
-	INCLUDEPATH += $${OPENCV_DIR}/include
+	INCLUDEPATH += C:\soft\opencv310\opencv\build\include
 	mingw {
 		LIBS += -L$${OPENCV_DIR}/x86/mingw/lib \
 			-lopencv_calib3d$${OPENCV_VER}.dll \
@@ -34,45 +34,11 @@ win32 {
 	} else {
 		QMAKE_CXXFLAGS += /MP
 		QMAKE_CXXFLAGS_WARN_ON = -W4
-		LIBS += -L$${OPENCV_DIR}/x86/vc11/lib
+		LIBS += -LC:\soft\opencv310\opencv\build\x64\vc14\lib
 		CONFIG(debug, debug|release) {
-			LIBS += opencv_calib3d$${OPENCV_VER}d.lib \
-				opencv_contrib$${OPENCV_VER}d.lib \
-				opencv_core$${OPENCV_VER}d.lib \
-				opencv_features2d$${OPENCV_VER}d.lib \
-				opencv_flann$${OPENCV_VER}d.lib \
-				opencv_gpu$${OPENCV_VER}d.lib \
-				opencv_highgui$${OPENCV_VER}d.lib \
-				opencv_imgproc$${OPENCV_VER}d.lib \
-				opencv_legacy$${OPENCV_VER}d.lib \
-				opencv_ml$${OPENCV_VER}d.lib \
-				opencv_nonfree$${OPENCV_VER}d.lib \
-				opencv_objdetect$${OPENCV_VER}d.lib \
-				opencv_photo$${OPENCV_VER}d.lib \
-				opencv_stitching$${OPENCV_VER}d.lib \
-				opencv_superres$${OPENCV_VER}d.lib \
-				opencv_ts$${OPENCV_VER}d.lib \
-				opencv_video$${OPENCV_VER}d.lib \
-				opencv_videostab$${OPENCV_VER}d.lib
+			LIBS += opencv_world310d.lib
 		} else {
-			LIBS += opencv_calib3d$${OPENCV_VER}.lib \
-				opencv_contrib$${OPENCV_VER}.lib \
-				opencv_core$${OPENCV_VER}.lib \
-				opencv_features2d$${OPENCV_VER}.lib \
-				opencv_flann$${OPENCV_VER}.lib \
-				opencv_gpu$${OPENCV_VER}.lib \
-				opencv_highgui$${OPENCV_VER}.lib \
-				opencv_imgproc$${OPENCV_VER}.lib \
-				opencv_legacy$${OPENCV_VER}.lib \
-				opencv_ml$${OPENCV_VER}.lib \
-				opencv_nonfree$${OPENCV_VER}.lib \
-				opencv_objdetect$${OPENCV_VER}.lib \
-				opencv_photo$${OPENCV_VER}.lib \
-				opencv_stitching$${OPENCV_VER}.lib \
-				opencv_superres$${OPENCV_VER}.lib \
-				opencv_ts$${OPENCV_VER}.lib \
-				opencv_video$${OPENCV_VER}.lib \
-				opencv_videostab$${OPENCV_VER}.lib
+			LIBS += opencv_world310.lib
 		}
 	}
 } android {

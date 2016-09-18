@@ -5,22 +5,16 @@
 #include "utils.h"
 #include "figure.h"
 
-#include "neural_net_char.cpp"
-#include "neural_net_num.cpp"
-
-using namespace cv;
-using namespace std;
-
-namespace { namespace aux {
-	NeuralNet_MLP mlp_char;
-	NeuralNet_MLP mlp_num;
+/*namespace { namespace aux {
+	cv::ml::NeuralNet_MLP mlp_char;
+	cv::ml::NeuralNet_MLP mlp_num;
 	static set< string > g_region_codes;
 	static string g_output_symbol_folder;
-} }
+} }*/
 
 void set_output_symbol_folder( const std::string& folder )
 {
-	aux::g_output_symbol_folder = folder;
+//	aux::g_output_symbol_folder = folder;
 }
 
 int search_max_val( const cv::Mat& data, int row )
@@ -40,10 +34,10 @@ int search_max_val( const cv::Mat& data, int row )
 
 cv::Mat convert_to_row( const cv::Mat& input )
 {
-	Mat one_chan_gray;
+	cv::Mat one_chan_gray;
 	if ( input.channels() == 3 && input.depth() == CV_MAT_DEPTH( CV_8U ) )
 	{
-		Mat gray( input.size(), CV_8U );
+		cv::Mat gray( input.size(), CV_8U );
 		cvtColor( input, one_chan_gray, CV_RGB2GRAY );
 	}
 	else if ( input.channels() == 1 && input.depth() == CV_MAT_DEPTH( CV_8U ) )
@@ -59,16 +53,16 @@ cv::Mat convert_to_row( const cv::Mat& input )
 	if ( !one_chan_gray.empty() )
 	{
 		// сглаживаем
-		boxFilter( one_chan_gray, one_chan_gray, -1, Size( 3, 3 ) );
+		boxFilter( one_chan_gray, one_chan_gray, -1, cv::Size( 3, 3 ) );
 		// растягиваем по цвету
 		equalizeHist( one_chan_gray, one_chan_gray );
-		Mat gray_float( one_chan_gray.size(), CV_32F );
+		cv::Mat gray_float( one_chan_gray.size(), CV_32F );
 		one_chan_gray.convertTo( gray_float, CV_32F );
 
-		Mat float_sized( data_height, data_width, CV_32F );
+		cv::Mat float_sized( data_height, data_width, CV_32F );
 		cv::resize( gray_float, float_sized, float_sized.size() );
 
-		Mat ret( 1, data_height * data_width, CV_32F );
+		cv::Mat ret( 1, data_height * data_width, CV_32F );
 		for ( int mm = 0; mm < data_height; ++mm )
 		{
 			for ( int kk = 0; kk < data_width; ++kk )
@@ -87,13 +81,13 @@ cv::Mat convert_to_row( const cv::Mat& input )
 
 cv::Mat from_file_to_row( const std::string& file_name )
 {
-	Mat next_mat( imread( file_name.c_str() ) );
+	cv::Mat next_mat( cv::imread( file_name.c_str() ) );
 	if ( !next_mat.empty() )
 	{
 		return convert_to_row( next_mat );
 	}
-	cerr << "Failed read file: " << file_name;
-	return Mat();
+	std::cerr << "Failed read file: " << file_name;
+	return cv::Mat();
 }
 
 char index_to_char_num( int index )
@@ -160,7 +154,7 @@ char index_to_char_char( int index )
 
 std::vector< char > all_symbols()
 {
-	vector< char > ret;
+	std::vector< char > ret;
 	ret.push_back( '0' );
 	ret.push_back( '1' );
 	ret.push_back( '2' );
@@ -206,7 +200,7 @@ double predict_min_diff( const cv::Mat& pred_out, int max_val )
 }
 
 
-std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& mlp, index_to_char_func i2c )
+/*std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& mlp, index_to_char_func i2c )
 {
 	assert( mlp.get_layer_count() != 0 );
 	Mat pred_out;
@@ -219,19 +213,21 @@ std::pair< char, double > proc_impl( const cv::Mat& input, cv::NeuralNet_MLP& ml
 		imwrite( next_file_name, input );
 	}
 	return ret;
-}
+}*/
 
 std::pair< char, double > proc_char( const cv::Mat& input )
 {
-	return proc_impl( input, aux::mlp_char, &index_to_char_char );
+	return std::pair< char, double >();
+//	return proc_impl( input, aux::mlp_char, &index_to_char_char );
 }
 
 std::pair< char, double > proc_num( const cv::Mat& input )
 {
-	return proc_impl( input, aux::mlp_num, &index_to_char_num );
+	return std::pair< char, double >();
+//	return proc_impl( input, aux::mlp_num, &index_to_char_num );
 }
-
-void init_nn( NeuralNet_MLP& mlp, const string& data )
+/*
+void init_nn( cv::NeuralNet_MLP& mlp, const std::string& data )
 {
 	assert( mlp.get_layer_count() == 0 );
 	try
@@ -251,11 +247,11 @@ void init_nn( NeuralNet_MLP& mlp, const string& data )
 	{
 		throw runtime_error( string( "Failed load train neural network state, reason: " ) + e.what() );
 	}
-}
+}*/
 
 void init_recognizer()
 {
-	init_nn( aux::mlp_char, string( neural_net_char, sizeof( neural_net_char ) ) );
+/*	init_nn( aux::mlp_char, string( neural_net_char, sizeof( neural_net_char ) ) );
 	init_nn( aux::mlp_num, string( neural_net_num, sizeof( neural_net_num ) ) );
 	aux::g_region_codes.insert( "178" ); // ХЗ
 	aux::g_region_codes.insert( "01" ); // Республика Адыгея
@@ -377,12 +373,12 @@ void init_recognizer()
 	aux::g_region_codes.insert( "89" ); // Ямало-Ненецкий автономный округ
 	aux::g_region_codes.insert( "92" ); // Резерв МВД Российской Федерации
 	aux::g_region_codes.insert( "94" ); // Территории, которые находятся вне РФ и
-	aux::g_region_codes.insert( "95" ); // Чеченская республика
+	aux::g_region_codes.insert( "95" ); // Чеченская республика*/
 }
 
-const std::set< std::string >& region_codes()
+/*const std::set< std::string >& region_codes()
 {
 	return aux::g_region_codes;
-}
+}*/
 
 

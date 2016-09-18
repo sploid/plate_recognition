@@ -1,13 +1,11 @@
 #include "engine.h"
-#include <opencv2/opencv.hpp>
 #include <assert.h>
+#include <functional>
 #include <stdexcept>
+#include <opencv2/opencv.hpp>
 #include "sym_recog.h"
 #include "utils.h"
 #include "figure.h"
-
-using namespace cv;
-using namespace std;
 
 struct number_data
 {
@@ -31,14 +29,14 @@ static int g_points_dublicate_first[ COUNT_GLOBAL_DATA ][ 1024 * 1024 * 10 ];
 static int g_points_dublicate_second[ COUNT_GLOBAL_DATA ][ 1024 * 1024 * 10 ];
 static int g_points_count[ COUNT_GLOBAL_DATA ] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 static pair_int g_pix_around[ COUNT_GLOBAL_DATA ][ 4 ] = {
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) },
-	{ make_pair( 0, 1 ), make_pair( - 1, 0 ), make_pair( 1, 0 ), make_pair( 0, - 1 ) } };
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) },
+	{ std::make_pair( 0, 1 ), std::make_pair( - 1, 0 ), std::make_pair( 1, 0 ), std::make_pair( 0, - 1 ) } };
 
 #ifdef _WIN32
 
@@ -48,9 +46,9 @@ static bool g_busy_indexes[ COUNT_GLOBAL_DATA ] = { false, false, false, false, 
 HANDLE h_data_guard = CreateMutex( NULL, FALSE, NULL );
 int get_free_index()
 {
-	if ( WaitForSingleObject( h_data_guard, INFINITE ) != WAIT_OBJECT_0 )
+	if ( ::WaitForSingleObject( h_data_guard, INFINITE ) != WAIT_OBJECT_0 )
 	{
-		throw runtime_error( "failed call winapi func" );
+		throw std::runtime_error( "failed call winapi func" );
 	}
 	for ( int nn = 0; nn < COUNT_GLOBAL_DATA; ++nn )
 	{
@@ -62,7 +60,7 @@ int get_free_index()
 		}
 	}
 	ReleaseMutex( h_data_guard );
-	throw runtime_error( "no free data" );
+	throw std::runtime_error( "no free data" );
 }
 
 void set_free_index( int index )
@@ -70,7 +68,7 @@ void set_free_index( int index )
 	assert( index >= 0 && index < COUNT_GLOBAL_DATA );
 	if ( WaitForSingleObject( h_data_guard, INFINITE ) != WAIT_OBJECT_0 )
 	{
-		throw runtime_error( "failed call winapi func" );
+		throw std::runtime_error( "failed call winapi func" );
 	}
 	g_busy_indexes[ index ] = false;
 	ReleaseMutex( h_data_guard );
@@ -90,41 +88,43 @@ void set_free_index( int index )
 
 #endif // _WIN32
 
-found_number read_number_loop( const Mat& input, const vector< int >& search_levels );
+const int kMinGroupSize = 4;
+
+found_number read_number_loop( const cv::Mat& input, const std::vector< int >& search_levels );
 
 inline pair_int operator - ( const pair_int& lh, const pair_int& rh )
 {
-	return make_pair( lh.first - rh.first, lh.second - rh.second );
+	return std::make_pair( lh.first - rh.first, lh.second - rh.second );
 }
 
 inline pair_int operator + ( const pair_int& lh, const pair_int& rh )
 {
-	return make_pair( lh.first + rh.first, lh.second + rh.second );
+	return std::make_pair( lh.first + rh.first, lh.second + rh.second );
 }
 
 inline pair_int operator * ( const pair_int& lh, const double& koef )
 {
-	return make_pair( static_cast< int >( static_cast< double >( lh.first ) * koef ), static_cast< int >( static_cast< double >( lh.second ) * koef ) );
+	return std::make_pair( static_cast< int >( static_cast< double >( lh.first ) * koef ), static_cast< int >( static_cast< double >( lh.second ) * koef ) );
 }
 
 inline pair_int operator / ( const pair_int& lh, const int& koef )
 {
-	return make_pair( lh.first / koef, lh.second / koef );
+	return std::make_pair( lh.first / koef, lh.second / koef );
 }
 
 inline pair_doub operator * ( const pair_doub& lh, const double& koef )
 {
-	return make_pair( static_cast< double >( lh.first * koef ), static_cast< double >( lh.second * koef ) );
+	return std::make_pair( static_cast< double >( lh.first * koef ), static_cast< double >( lh.second * koef ) );
 }
 
 // Рассчитываем центры символов
-vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height )
+std::vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height )
 {
 	const double angl_grad = static_cast< double >( std::abs( angle < 0 ? angle + 10 : angle ) ) * 3.14 / 180.;
 	const double koef = static_cast< double >( first_fig_height ) * cos( angl_grad );
 	const double move_by_y = koef * 0.2;
 	double move_by_x = 0.;
-	vector< pair_int > etalons;
+	std::vector< pair_int > etalons;
 	if ( angle >= 0 )
 	{
 		move_by_x = koef * 0.96;
@@ -133,14 +133,14 @@ vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_height
 	{
 		move_by_x = koef * 1.06;
 	}
-	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
-	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
-	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
-	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), 0 ) );
-	etalons.push_back( make_pair( static_cast< int >( 1. * move_by_x ), 0 ) );
+	etalons.push_back( std::make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( std::make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( std::make_pair( static_cast< int >( 1. * move_by_x ), -1 * static_cast< int >( move_by_y ) ) );
+	etalons.push_back( std::make_pair( static_cast< int >( 1. * move_by_x ), 0 ) );
+	etalons.push_back( std::make_pair( static_cast< int >( 1. * move_by_x ), 0 ) );
 
-	vector< pair_int > ret;
-	const pair_int ret_front( make_pair( 0, 0 ) );
+	std::vector< pair_int > ret;
+	const pair_int ret_front( std::make_pair( 0, 0 ) );
 	ret.push_back( ret_front );
 
 	for ( int nn = index - 1; nn >= 0; --nn )
@@ -179,7 +179,7 @@ bool angle_is_equal( int an1, int an2 )
 	return false;
 }
 
-pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& original, number_data& stat_data )
+std::pair< char, double > find_sym_nn( bool num, const Figure& fig, const cv::Mat& original, number_data& stat_data )
 {
 	const int left = fig.left();
 	assert( left >= 0 );
@@ -205,21 +205,21 @@ pair< char, double > find_sym_nn( bool num, const figure& fig, const Mat& origin
 		stat_data.m_cache_origin = &original;
 	}
 
-	map< pair< cv::Rect, bool >, pair< char, double >  >::const_iterator it = stat_data.m_cache_rets.find( make_pair( sym_border, num ) );
+	std::map< std::pair< cv::Rect, bool >, std::pair< char, double >  >::const_iterator it = stat_data.m_cache_rets.find( std::make_pair( sym_border, num ) );
 	if ( it != stat_data.m_cache_rets.end() )
 	{
 		return it->second;
 	}
 
-	Mat mm( original.clone(), sym_border );
-	pair< char, double >  ret = num ? proc_num( mm ) : proc_char( mm );
-	stat_data.m_cache_rets[ make_pair( sym_border, num ) ] = ret;
+	cv::Mat mm( original.clone(), sym_border );
+	std::pair< char, double >  ret = num ? proc_num( mm ) : proc_char( mm );
+	stat_data.m_cache_rets[ std::make_pair( sym_border, num ) ] = ret;
 	return ret;
 }
 
 // выбираем пиксели что бы получить контур, ограниченный белыми пикселями
 template< int stat_data_index >
-void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border = -1, int bottom_border = -1 )
+void add_pixel_as_spy( int row, int col, cv::Mat& mat, Figure& fig, int top_border = -1, int bottom_border = -1 )
 {
 //	time_mesure tm( "NEXT:" );
 	if ( top_border == -1 ) // верняя граница поиска
@@ -264,29 +264,29 @@ void add_pixel_as_spy( int row, int col, Mat& mat, figure& fig, int top_border =
 	assert( fig.is_empty() || fig.left() >= 0 );
 }
 
-bool fig_less_left( const figure& lf, const figure& rf )
+bool fig_less_left( const Figure& lf, const Figure& rf )
 {
 	return lf.left() < rf.left();
 }
 
-bool less_by_left_pos( const figure& lf, const figure& rf )
+bool less_by_left_pos( const Figure& lf, const Figure& rf )
 {
 	return fig_less_left( lf, rf );
 }
 
-void draw_figures( const figure_group& figs, const Mat& etal, const string& key = "figs" )
+void draw_figures( const FigureGroup& figs, const cv::Mat& etal, const std::string& key = "figs" )
 {
-	Mat colored_rect( etal.size(), CV_8UC3 );
+	cv::Mat colored_rect( etal.size(), CV_8UC3 );
 	cvtColor( etal, colored_rect, CV_GRAY2RGB );
 	for ( size_t mm = 0; mm < figs.size(); ++mm )
 	{
-		const figure* cur_fig = &figs.at( mm );
-		rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
+		const Figure* cur_fig = &figs.at( mm );
+		rectangle( colored_rect, cv::Point( cur_fig->left(), cur_fig->top() ), cv::Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
 	}
 	imwrite( next_name( key ), colored_rect );
 }
 
-figure find_figure( const figure_group& gr, const pair_int& pos )
+Figure find_figure( const FigureGroup& gr, const pair_int& pos )
 {
 	for ( size_t nn = 0; nn < gr.size(); ++nn )
 	{
@@ -296,100 +296,83 @@ figure find_figure( const figure_group& gr, const pair_int& pos )
 			return gr[ nn ];
 		}
 	}
-	return figure();
+	return Figure();
 }
 
 // Выкидываем группы, которые включают в себя другие группы
-void groups_remove_included( vector< figure_group > & groups )
-{
-	// todo: переписать постоянное создание set
-	bool merge_was = true;
-	while ( merge_was )
-	{
-		merge_was = false;
-		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
-		{
-			const set< figure > s_cur_f = to_set( groups[ nn ] );
-			for ( size_t mm = 0; mm < groups.size() && !merge_was; mm++ )
-			{
-				if ( nn != mm )
-				{
-					const set< figure > s_test_f = to_set( groups[ mm ] );
-					if ( includes( s_cur_f.begin(), s_cur_f.end(), s_test_f.begin(), s_test_f.end() ) )
-					{
-						// нашли совпадение
-						groups.erase( groups.begin() + mm );
-						merge_was = true;
-						break;
-					}
-				}
-			}
-		}
-	}
+void RemoveIncludedGroups(std::vector<FigureGroup>& groups ) {
+  // todo: переписать постоянное создание set
+  bool merge_was = true;
+  while (merge_was) {
+    merge_was = false;
+    for (size_t nn = 0; nn < groups.size() && !merge_was; ++nn) {
+      const std::set<Figure> s_cur_f = to_set(groups[nn]);
+      for (size_t mm = 0; mm < groups.size() && !merge_was; mm++) {
+        if (nn != mm) {
+          const std::set<Figure> s_test_f = to_set( groups[mm]);
+          if (includes(s_cur_f.begin(), s_cur_f.end(), s_test_f.begin(), s_test_f.end())) {
+            // нашли совпадение
+            groups.erase(groups.begin() + mm);
+            merge_was = true;
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
 // сливаем пересекающиеся группы
-void groups_merge_intersects( vector< figure_group > & groups )
-{
-	bool merge_was = true;
-	while ( merge_was )
-	{
-		merge_was = false;
-		for ( size_t nn = 0; nn < groups.size() && !merge_was; ++nn )
-		{
-			const set< figure > s_cur_f = to_set( groups[ nn ] );
-			for ( size_t mm = 0; mm < groups.size() && !merge_was; ++mm )
-			{
-				if ( nn != mm )
-				{
-					set< figure > s_test_f = to_set( groups[ mm ] );
-					if ( find_first_of( s_test_f.begin(), s_test_f.end(), s_cur_f.begin(), s_cur_f.end() ) != s_test_f.end() )
-					{
-						// нашли пересечение
-						set< figure > ss_nn = to_set( groups[ nn ] );
-						const set< figure > ss_mm = to_set( groups[ mm ] );
-						ss_nn.insert( ss_mm.begin(), ss_mm.end() );
-						vector< figure > res;
-						for ( set< figure >::const_iterator it = ss_nn.begin();
-							it != ss_nn.end(); ++it )
-						{
-							res.push_back( *it );
-						}
-						groups[ nn ] = res;
-						groups.erase( groups.begin() + mm );
-						merge_was = true;
-						break;
-					}
-				}
-			}
-		}
-	}
+void MergeIntersectsGroups(std::vector<FigureGroup>& groups) {
+  bool merge_was = true;
+  while ( merge_was ) {
+    merge_was = false;
+    for (size_t nn = 0; nn < groups.size() && !merge_was; ++nn) {
+      const std::set<Figure> s_cur_f = to_set(groups[nn]);
+      for (size_t mm = 0; mm < groups.size() && !merge_was; ++mm) {
+        if (nn != mm) {
+          std::set<Figure> s_test_f = to_set(groups[mm]);
+          if (find_first_of(s_test_f.begin(), s_test_f.end(), s_cur_f.begin(), s_cur_f.end()) != s_test_f.end()) {
+            // нашли пересечение
+            std::set<Figure> ss_nn = to_set(groups[nn]);
+            const std::set< Figure > ss_mm = to_set(groups[mm]);
+            ss_nn.insert(ss_mm.begin(), ss_mm.end());
+            std::vector< Figure > res;
+            for (std::set<Figure>::const_iterator it = ss_nn.begin(); it != ss_nn.end(); ++it) {
+              res.push_back(*it);
+            }
+            groups[nn] = res;
+            groups.erase(groups.begin() + mm);
+            merge_was = true;
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
-void groups_remove_to_small( vector< figure_group > & groups )
-{
-	for ( int nn = groups.size() - 1; nn >= 0; --nn )
-	{
-		if ( groups[ nn ].size() < 3 )
-		{
-			groups.erase( groups.begin() + nn );
-		}
-	}
+void RemoveToSmallGroups(std::vector<FigureGroup>& groups) {
+  for (int nn = static_cast<int>(groups.size()) - 1; nn >= 0; --nn) {
+    if (groups[nn].size() < kMinGroupSize) {
+      groups.erase( groups.begin() + nn );
+    }
+  }
 }
 
 // выкидываем элементы, что выходят за размеры номера, предпологаем что номер не выше 3 * высота первого элемента
-void figs_remote_too_long_by_y_from_first( vector< figure_group > & groups )
+void figs_remote_too_long_by_y_from_first( std::vector< FigureGroup > & groups )
 {
 	for ( size_t nn = 0; nn < groups.size(); ++nn )
 	{
 		if ( groups[ nn ].size() > 2 )
 		{
-			const figure& first_fig = groups[ nn ].at( 0 );
+			const Figure& first_fig = groups[ nn ].at( 0 );
 			const double height_first = first_fig.height();
 			assert( first_fig.height() > 0. );
 			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
 			{
-				const figure& cur_fig = groups[ nn ][ mm ];
+				const Figure& cur_fig = groups[ nn ][ mm ];
 				if ( abs( double( cur_fig.top() - first_fig.top() ) / 3. ) > height_first )
 				{
 					groups[ nn ].erase( groups[ nn ].begin() + mm );
@@ -398,158 +381,133 @@ void figs_remote_too_long_by_y_from_first( vector< figure_group > & groups )
 		}
 	}
 	// выкидываем группы, где меньше 3-х элементов
-	groups_remove_to_small( groups );
+        RemoveToSmallGroups(groups);
 }
 
-// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
-void figs_remote_too_long_by_x_from_first( vector< figure_group > & groups )
-{
-	for ( size_t nn = 0; nn < groups.size(); ++nn )
-	{
-		if ( groups[ nn ].size() > 2 )
-		{
-			const figure& first_fig = groups[ nn ].at( 0 );
-			const double width_first = first_fig.width();
-			assert( first_fig.width() > 0. );
-			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
-			{
-				const figure& cur_fig = groups[ nn ][ mm ];
-				if ( double( cur_fig.left() - first_fig.left() ) / 7. > width_first )
-				{
-					// @todo: тут можно оптимизировать и в начале найти самую допустимо-дальнюю, а уже затем чистить список
-					groups[ nn ].erase( groups[ nn ].begin() + mm );
-				}
-				else
-				{
-					// тут брик, т.к. фигуры отсортированы по оси х и все предыдущие будут левее
-					break;
-				}
-			}
-		}
-	}
-	// выкидываем группы, где меньше 3-х элементов
-	groups_remove_to_small( groups );
+// выкидываем элементы, что выходят за размеры номера относительно первого элемента
+void RemoteTooFarFromFirst(std::vector<FigureGroup>& groups, int max_dist_coef_to_hei, std::function<int(const Figure&)> get_pos) {
+  for (size_t nn = 0; nn < groups.size(); ++nn) {
+    std::vector<FigureGroup>::iterator cur_group_iter = groups.begin() + nn;
+    assert(cur_group_iter->size() >= 3);
+    const Figure& first_fig = cur_group_iter->at(0);
+    const int max_dist = first_fig.height() * max_dist_coef_to_hei;
+    assert(first_fig.height() > 0.);
+    for (int mm = cur_group_iter->size() - 1; mm >= 1; --mm) {
+      const Figure& cur_fig = cur_group_iter->at(mm);
+      if (get_pos(cur_fig) - get_pos(first_fig) > max_dist) {
+        // @todo: тут можно оптимизировать и в начале найти самую допустимо-дальнюю, а уже затем чистить список
+        cur_group_iter->erase(cur_group_iter->begin() + mm);
+      } else {
+        // тут брик, т.к. фигуры отсортированы по оси х и все предыдущие будут левее
+        break;
+      }
+    }
+  }
+  // выкидываем группы, где меньше 3-х элементов
+  RemoveToSmallGroups(groups);
 }
 
-void figs_remove_invalid_from_first_by_size( vector< figure_group > & groups )
-{
-	for ( size_t nn = 0; nn < groups.size(); ++nn )
-	{
-		assert( groups[ nn ].size() > 2 );
-		const figure& first_fig = groups[ nn ][ 0 ];
-		const double width_first = first_fig.right() - first_fig.left();
-		const double height_first = first_fig.bottom() - first_fig.top();
-		assert( width_first > 0. );
-		for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
-		{
-			const figure& cur_fig = groups[ nn ][ mm ];
-			const double width_cur = cur_fig.right() - cur_fig.left();
-			const double height_cur = first_fig.bottom() - first_fig.top();
-			if ( width_cur > width_first * 1.5 || width_cur < width_first * 0.6
-				|| height_cur > height_first * 1.5 || height_cur < height_first * 0.6 )
-			{
-				groups[ nn ].erase( groups[ nn ].begin() + mm );
-			}
-		}
-	}
-	// выкидываем группы, где меньше 3-х элементов
-	groups_remove_to_small( groups );
+void RemoveNotFitToFirstByHeight( std::vector< FigureGroup > & groups ) {
+  for (size_t nn = 0; nn < groups.size(); ++nn) {
+    std::vector<FigureGroup>::iterator cur_group_iter = groups.begin() + nn;
+    const Figure& first_fig = cur_group_iter->at(0);
+    const double height_first = static_cast<double>(first_fig.bottom() - first_fig.top());
+    for (int mm = cur_group_iter->size() - 1; mm >= 1; --mm) {
+      const Figure& cur_fig = cur_group_iter->at(mm);
+      const double height_cur = cur_fig.bottom() - cur_fig.top();
+      if (height_cur > height_first * 1.5 || height_cur < height_first * 0.6) {
+        cur_group_iter->erase(cur_group_iter->begin() + mm);
+      }
+    }
+  }
+
+  RemoveToSmallGroups(groups);
 }
 
 // по отдельным фигурам создаем группы фигур
-vector< figure_group > make_groups( vector< figure >& figs )
-{
-	using namespace std;
-	vector< figure_group > groups;
-	for ( size_t nn = 0; nn < figs.size(); ++nn )
-	{
-		vector< pair< double, figure_group > > cur_fig_groups;
-		// todo: тут возможно стоит идти только от nn + 1, т.к. фигуры отсортированы и идем только вправо
-		for ( size_t mm = 0; mm < figs.size(); ++mm )
-		{
-			if ( mm != nn )
-			{
-				if ( figs[ mm ].left() > figs[ nn ].left() )
-				{
-					// угол между левыми-нижними углами фигуры
-					const double angle = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - figs[ nn ].left() ), static_cast< double >( figs[ mm ].bottom() - figs[ nn ].bottom() ) );
-					bool found = false;
-					for ( size_t kk = 0; kk < cur_fig_groups.size(); ++kk )
-					{
-						// проверяем что попадает в группу
-						if ( angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle ) ) )
-						{
-							bool ok = true;
-							// проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
-							for ( size_t yy = 1; yy < cur_fig_groups[ kk ].second.size(); ++yy )
-							{
-								const figure& next_fig = cur_fig_groups[ kk ].second.at( yy );
-								const double angle_to_fig = 57.2957795 * atan2( static_cast< double >( figs[ mm ].left() - next_fig.left() ), static_cast< double >( figs[ mm ].bottom() - next_fig.bottom() ) );
-								if ( !angle_is_equal( static_cast< int >( cur_fig_groups[ kk ].first ), static_cast< int >( angle_to_fig ) ) )
-								{
-									ok = false;
-									break;
-								}
-							}
-							if ( ok )
-							{
-								cur_fig_groups[ kk ].second.push_back( figs[ mm ] );
-								found = true;
-								break;
-							}
-						}
-					}
-					// создаем группу
-					if ( !found )
-					{
-						figure_group to_add;
-						to_add.push_back( figs[ nn ] );
-						to_add.push_back( figs[ mm ] );
-						cur_fig_groups.push_back( make_pair( angle, to_add ) );
-					}
-				}
-			}
-		}
-		// проверяем что бы элементов в группе было больше 3-х
-		for ( size_t mm = 0; mm < cur_fig_groups.size(); ++mm )
-		{
-			if ( cur_fig_groups[ mm ].second.size() >= 3 )
-			{
-				// сортируем фигуры в группах, что бы они шли слева направо
-				sort( cur_fig_groups[ mm ].second.begin(), cur_fig_groups[ mm ].second.end(), fig_less_left );
-				groups.push_back( cur_fig_groups[ mm ].second );
-			}
-		}
-	}
-	// выкидываем все группы, у которых угол больше 30 градусов
-	for ( int nn = groups.size() - 1; nn >= 0; --nn )
-	{
-		const double xx = abs( static_cast< double >( groups.at( nn ).at( 0 ).left() - groups.at( nn ).at( 1 ).left() ) );
-		const double yy = abs( static_cast< double >( groups.at( nn ).at( 0 ).bottom() - groups.at( nn ).at( 1 ).bottom() ) );
-		const double angle_to_fig = abs( 57.2957795 * atan2( yy, xx ) );
-		if ( angle_to_fig > 30. && angle_to_fig < 330. )
-		{
-			groups.erase( groups.begin() + nn );
-		}
-	}
-	return groups;
+std::vector<FigureGroup> MakeGroupsByAngle(std::vector<Figure>& figs) {
+  std::vector<FigureGroup> result;
+
+  // формируем группы по углу
+  for (size_t nn = 0; nn < figs.size(); ++nn) {
+    std::vector<std::pair<double, FigureGroup>> cur_fig_groups;
+    // todo: тут возможно стоит идти только от nn + 1, т.к. фигуры отсортированы и идем только вправо
+    for (size_t mm = 0; mm < figs.size(); ++mm) {
+      if (mm != nn) {
+        if (figs[mm].left() > figs[nn].left()) {
+	  // угол между левыми-нижними углами фигуры
+	  const double angle = 57.2957795 * atan2(static_cast<double>(figs[mm].left() - figs[nn].left()), static_cast<double>(figs[mm].bottom() - figs[nn].bottom()));
+	  bool found = false;
+          for (size_t kk = 0; kk < cur_fig_groups.size(); ++kk) {
+            // проверяем что попадает в группу
+            if (angle_is_equal(static_cast<int>(cur_fig_groups[kk].first), static_cast<int>(angle))) {
+              bool ok = true;
+              // проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
+              for (size_t yy = 1; yy < cur_fig_groups[kk].second.size(); ++yy) {
+                const Figure& next_fig = cur_fig_groups[kk].second.at(yy);
+		const double angle_to_fig = 57.2957795 * atan2(static_cast<double>(figs[mm].left() - next_fig.left()), static_cast<double>(figs[mm].bottom() - next_fig.bottom()));
+                if (!angle_is_equal(static_cast<int>(cur_fig_groups[kk].first), static_cast<int>(angle_to_fig))) {
+                  ok = false;
+                  break;
+                }
+              }
+              if (ok) {
+                cur_fig_groups[kk].second.push_back(figs[mm]);
+                found = true;
+                break;
+              }
+            }
+          }
+
+          // создаем группу
+          if ( !found ) {
+            FigureGroup to_add;
+            to_add.push_back( figs[ nn ] );
+            to_add.push_back( figs[ mm ] );
+            cur_fig_groups.push_back( std::make_pair( angle, to_add ) );
+          }
+        }
+      }
+    }
+
+    // проверяем что бы элементов в группе было больше 3-х
+    for (size_t mm = 0; mm < cur_fig_groups.size(); ++mm) {
+      if (cur_fig_groups[mm].second.size() >= kMinGroupSize) {
+        // сортируем фигуры в группах, что бы они шли слева направо
+        sort(cur_fig_groups[mm].second.begin(), cur_fig_groups[mm].second.end(), fig_less_left);
+        result.push_back(cur_fig_groups[mm].second);
+      }
+    }
+  }
+
+  // выкидываем все группы, у которых угол больше 30 градусов
+  for ( int nn = static_cast<int>(result.size()) - 1; nn >= 0; --nn) {
+    const double xx = abs(static_cast<double>(result.at(nn).at(0).left() - result.at(nn).at(1).left()));
+    const double yy = abs( static_cast<double>(result.at(nn).at(0).bottom() - result.at(nn).at(1).bottom()));
+    const double angle_to_fig = abs(57.2957795 * atan2(yy, xx));
+    if (angle_to_fig > 30. && angle_to_fig < 330.) {
+      result.erase(result.begin() + nn);
+    }
+  }
+
+  return result;
 }
 
 struct found_symbol
 {
-	figure fig;
+  Figure fig;
 	size_t pos_in_pis_index;
 	char symbol;
 	double weight;
 };
 
-found_number find_best_number_by_weight( const vector< found_number >& vals, const Mat* etal = 0 )
+found_number find_best_number_by_weight( const std::vector< found_number >& vals, const cv::Mat* etal = 0 )
 {
 	(void)etal;
 	assert( !vals.empty() );
 	if ( vals.empty() )
 		return found_number();
-	int best_index = 0;
+	size_t best_index = 0;
 	for ( size_t nn = 1; nn < vals.size(); ++nn )
 	{
 		if ( vals[ best_index ] < vals[ nn ] )
@@ -560,11 +518,11 @@ found_number find_best_number_by_weight( const vector< found_number >& vals, con
 		cout << tt << " " << vals[ best_index ].number << " " << vals[ best_index ].weight << endl;
 		if ( etal )
 		{
-			Mat colored_rect( etal->size(), CV_8UC3 );
+			cv::Mat colored_rect( etal->size(), CV_8UC3 );
 			cvtColor( *etal, colored_rect, CV_GRAY2RGB );
 			for ( size_t nn = 0; nn < vals[ best_index ].figs.size(); ++nn )
 			{
-				const figure* cur_fig = &vals[ best_index ].figs.at( nn );
+				const Figure* cur_fig = &vals[ best_index ].figs.at( nn );
 				rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
 			}
 			imwrite( next_name( "fig" ), colored_rect );
@@ -574,7 +532,7 @@ found_number find_best_number_by_weight( const vector< found_number >& vals, con
 	return vals[ best_index ];
 }
 
-found_number create_number_by_pos( const vector< pair_int >& pis, const vector< found_symbol >& figs_by_pos )
+found_number create_number_by_pos( const std::vector< pair_int >& pis, const std::vector< found_symbol >& figs_by_pos )
 {
 	assert( pis.size() == 6 );
 	found_number ret;
@@ -601,11 +559,11 @@ found_number create_number_by_pos( const vector< pair_int >& pis, const vector< 
 	return ret;
 }
 
-vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pair_int& pos_center, const figure_group& cur_gr, const Mat& original, number_data& stat_data )
+std::vector< found_symbol > figs_search_syms( const std::vector< pair_int >& pis, const pair_int& pos_center, const FigureGroup& cur_gr, const cv::Mat& original, number_data& stat_data )
 {
 //	draw_figures( cur_gr, etal );
-	vector< found_symbol > ret;
-	set< figure > procs_figs;
+	std::vector< found_symbol > ret;
+	std::set<Figure> procs_figs;
 	assert( pis.size() == 6 );
 	pair_int prev_pos = pos_center;
 	for ( size_t kk = 0; kk < pis.size(); ++kk )
@@ -618,7 +576,7 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pa
 			&& procs_figs.find( next.fig  ) == procs_figs.end() )
 		{
 			procs_figs.insert( next.fig );
-			const pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original, stat_data );
+			const std::pair< char, double > cc = find_sym_nn( kk >= 1 && kk <= 3, next.fig, original, stat_data );
 			assert( cc.first != 0 );
 			next.pos_in_pis_index = kk;
 			next.symbol = cc.first;
@@ -634,58 +592,50 @@ vector< found_symbol > figs_search_syms( const vector< pair_int >& pis, const pa
 	return ret;
 }
 
-vector< found_number > search_number( Mat& etal, vector< figure_group >& groups, const Mat& original, number_data& stat_data )
-{
-	// ищем позиции фигур и соответсвующие им символы
-	vector< found_number > ret;
-	for ( size_t nn = 0; nn < groups.size(); ++nn )
-	{
-		vector< found_number > fig_nums_sums;
-		const figure_group& cur_gr = groups[ nn ];
-		// перебираем фигуры, подставляя их на разные места (пока перебираем только фигуры 0-1-2)
-		for ( size_t mm = 0; mm < min( cur_gr.size(), size_t( 2 ) ); ++mm )
-		{
-			const figure & cur_fig = cur_gr[ mm ];
-			const pair_int cen = cur_fig.center();
-			// подставляем текущую фигуру на все позиции (пока ставим только первую и вторую фигуру)
-			for ( int ll = 0; ll < 1; ++ll )
-			{
-				// меняем угол наклона номера относительно нас (0 - смотрим прям на номер, если угол меньше 0, то определяем номер с 2-х значным регионом)
-				for ( int oo = -60; oo < 50; oo += 10 )
-				{
-					const vector< pair_int > pis = calc_syms_centers( ll, oo, cur_fig.height() );
-					assert( pis.size() == 6 ); // всегда 6 символов без региона в номере
-					const vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, original, stat_data );
-					const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
-					fig_nums_sums.push_back( number_sum );
-				}
-			}
-		}
-
-		// выбираем лучшее
-		if ( !fig_nums_sums.empty() )
-		{
-			ret.push_back( find_best_number_by_weight( fig_nums_sums, &etal ) );
-		}
-	}
-
-	// отрисовываем выбранные группы
-/*	for ( size_t nn = 0; nn < groups.size(); ++nn )
-	{
-		Mat colored_rect( etal.size(), CV_8UC3 );
-		cvtColor( etal, colored_rect, CV_GRAY2RGB );
-		for ( int mm = 0; mm < groups.at( nn ).size(); ++mm )
-		{
-			const figure* cur_fig = &groups.at( nn ).at( mm );
-			rectangle( colored_rect, Point( cur_fig->left(), cur_fig->top() ), Point( cur_fig->right(), cur_fig->bottom() ), CV_RGB( 0, 255, 0 ) );
-		}
-		imwrite( next_name( "d" ), colored_rect );
-		recog_debug->out_image( colored_rect );
-	}*/
-	return ret;
+found_number RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, const cv::Mat& original, number_data& stat_data) {
+  found_number result;
+  return result;
 }
 
-int fine_best_index( const vector< found_number >& found_nums )
+std::vector<found_number> RecognizeNumber(cv::Mat& etal, std::vector<FigureGroup>& groups, const cv::Mat& original, number_data& stat_data) {
+  // ищем позиции фигур и соответсвующие им символы
+  std::vector<found_number> ret;
+  for (size_t nn = 0; nn < groups.size(); ++nn) {
+    const found_number fn = RecognizeNumberByGroup(etal, groups.at(nn), original, stat_data);
+    if (fn.is_valid()) {
+      ret.push_back(fn);
+    }
+
+
+/*    std::vector<found_number> fig_nums_sums;
+    const FigureGroup& cur_gr = groups[nn];
+    // перебираем фигуры, подставляя их на разные места (пока перебираем только фигуры 0-1-2)
+    for (size_t mm = 0; mm < 2; ++mm) { // todo: закоментил перебор первого символа
+      const Figure& cur_fig = cur_gr[mm];
+      const pair_int cen = cur_fig.center();
+      // подставляем текущую фигуру на все позиции (пока ставим только первую и вторую фигуру)
+      for (int ll = 0; ll < 1; ++ll) {
+        // меняем угол наклона номера относительно нас (0 - смотрим прям на номер, если угол меньше 0, то определяем номер с 2-х значным регионом)
+        for (int oo = -60; oo < 50; oo += 10) {
+          const std::vector<pair_int> pis = calc_syms_centers(ll, oo, cur_fig.height());
+          assert(pis.size() == 6); // всегда 6 символов без региона в номере
+          const std::vector< found_symbol > figs_by_pos = figs_search_syms( pis, cen, cur_gr, original, stat_data );
+          const found_number number_sum = create_number_by_pos( pis, figs_by_pos );
+          fig_nums_sums.push_back( number_sum );
+        }
+      }
+    }
+
+    // выбираем лучшее
+    if (!fig_nums_sums.empty()) {
+      ret.push_back( find_best_number_by_weight(fig_nums_sums, &etal) );
+    }*/
+  }
+
+  return ret;
+}
+
+int fine_best_index( const std::vector< found_number >& found_nums )
 {
 	if ( found_nums.empty() )
 		return -1;
@@ -702,9 +652,9 @@ int fine_best_index( const vector< found_number >& found_nums )
 	return ret;
 }
 
-Mat create_gray_image( const Mat& input )
+cv::Mat create_gray_image( const cv::Mat& input )
 {
-	Mat gray( input.size(), CV_8U );
+	cv::Mat gray( input.size(), CV_8U );
 	if ( input.channels() == 1 )
 	{
 		gray = input;
@@ -715,48 +665,40 @@ Mat create_gray_image( const Mat& input )
 	}
 	else
 	{
-		cout << "!!! Invalid chanel count: " << input.channels() << " !!!" << endl;
+		std::cout << "!!! Invalid chanel count: " << input.channels() << " !!!" << std::endl;
 		assert( !"не поддерживаемое количество каналов" );
 	}
 	return gray;
 }
 
 // бьем картинку на фигуры
-template< int stat_data_index >
-vector< figure > parse_to_figures( Mat& mat )
-{
-//	time_mesure to_fig( "TO_FIGS: " );
-	vector< figure > ret;
-	ret.reserve( 1000 );
-	for ( int nn = 0; nn < mat.rows; ++nn )
-	{
-		for ( int mm = 0; mm < mat.cols; ++mm )
-		{
-			if ( mat.at< unsigned char >( nn, mm ) == 0 )
-			{
-				figure fig_to_create;
-				add_pixel_as_spy< stat_data_index >( nn, mm, mat, fig_to_create );
-				if ( fig_to_create.is_too_big() )
-				{
-					// проверяем что высота больше ширины
-					if ( fig_to_create.width() < fig_to_create.height() )
-					{
-						if ( fig_to_create.width() > 4 )
-						{
-							if ( fig_to_create.height() / fig_to_create.width() < 4 )
-							{
-								ret.push_back( fig_to_create );
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+template<int stat_data_index>
+FigureGroup ParseToFigures(cv::Mat& mat) {
+// time_mesure to_fig( "TO_FIGS: " );
+  FigureGroup ret;
+  ret.reserve(1000);
+  for (int nn = 0; nn < mat.rows; ++nn) {
+    for (int mm = 0; mm < mat.cols; ++mm ) {
+      if (mat.at<unsigned char>(nn, mm) == 0) {
+        Figure fig_to_create;
+        add_pixel_as_spy<stat_data_index>(nn, mm, mat, fig_to_create);
+        if (fig_to_create.is_too_big()) {
+           // проверяем что высота больше ширины
+          if (fig_to_create.width() < fig_to_create.height()) {
+            if (fig_to_create.width() > 1) {
+//              if (fig_to_create.height() / fig_to_create.width() < 4) {
+                ret.push_back( fig_to_create );
+///	      }
+	    }
+          }
+        }
+      }
+    }
+  }
 	// отрисовываем найденные фигуры
 /*	if ( !ret.empty() )
 	{
-		Mat colored_mat( mat.size(), CV_8UC3 );
+		cv::Mat colored_mat( mat.size(), CV_8UC3 );
 		cvtColor( mat, colored_mat, CV_GRAY2RGB );
 		for ( size_t nn = 0; nn < ret.size(); ++nn )
 		{
@@ -764,29 +706,29 @@ vector< figure > parse_to_figures( Mat& mat )
 		}
 		recog_debug->out_image( colored_mat );
 	}*/
-	sort( ret.begin(), ret.end(), less_by_left_pos );
-	return ret;
+  sort( ret.begin(), ret.end(), less_by_left_pos );
+  return ret;
 }
 
-void fill_reg( vector< vector< pair_doub > >& data, double x1, double y1, double x2, double y2, double x3, double y3 )
+void fill_reg( std::vector< std::vector< pair_doub > >& data, double x1, double y1, double x2, double y2, double x3, double y3 )
 {
-	vector< pair_doub > tt;
-	tt.push_back( make_pair( x1, y1 ) );
-	tt.push_back( make_pair( x2, y2 ) );
-	tt.push_back( make_pair( x3, y3 ) );
+	std::vector< pair_doub > tt;
+	tt.push_back( std::make_pair( x1, y1 ) );
+	tt.push_back( std::make_pair( x2, y2 ) );
+	tt.push_back( std::make_pair( x3, y3 ) );
 	data.push_back( tt );
 }
 
-void fill_reg( vector< vector< pair_doub > >& data, double x1, double y1, double x2, double y2 )
+void fill_reg( std::vector< std::vector< pair_doub > >& data, double x1, double y1, double x2, double y2 )
 {
-	vector< pair_doub > tt;
-	tt.push_back( make_pair( x1, y1 ) );
-	tt.push_back( make_pair( x2, y2 ) );
+	std::vector< pair_doub > tt;
+	tt.push_back( std::make_pair( x1, y1 ) );
+	tt.push_back( std::make_pair( x2, y2 ) );
 	data.push_back( tt );
 }
 
 // ищем ближайшую черную точку
-pair_int search_nearest_black( const Mat& etal, const pair_int& center )
+pair_int search_nearest_black( const cv::Mat& etal, const pair_int& center )
 {
 	pair_int dist_x( center.first, center.first );
 	pair_int dist_y( center.second, center.second );
@@ -827,64 +769,64 @@ struct sym_info
 	{
 		return m_symbol != '?' && m_fig.is_empty();
 	}
-	bool operator==( const figure & other ) const
+	bool operator==( const Figure& other ) const
 	{
 		return m_fig == other;
 	}
 	char m_symbol;
 	double m_weight;
-	figure m_fig;
+        Figure m_fig;
 };
 
 template< int stat_data_index >
-void search_region_symbol( found_number& number, const Mat& etal, const Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
+void search_region_symbol( found_number& number, const cv::Mat& etal, const cv::Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
 {
-//	number.m_figs.push_back( figure( reg_center, make_pair( 1, 1 ) ) );
+//	number.m_figs.push_back( Figure( reg_center, std::make_pair( 1, 1 ) ) );
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
-//	number.m_figs.push_back( figure( nearest_black, make_pair( 1, 1 ) ) );
+//	number.m_figs.push_back( Figure( nearest_black, std::make_pair( 1, 1 ) ) );
 //	return;
 
 	if ( nearest_black.first != -1
 		&& nearest_black.second != -1 )
 	{
-		figure top_border_fig;
-		figure conture_fig;
-		Mat to_search = etal.clone();
+          Figure top_border_fig;
+          Figure conture_fig;
+		cv::Mat to_search = etal.clone();
 		// Ищем контуры по верхней границе
 		add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_search, top_border_fig, -1, nearest_black.second + 1 );
 		if ( top_border_fig.top() > reg_center.second - static_cast< int >( avarage_height ) ) // ушли не далее чем на одну фигуру
 		{
-			Mat to_contur = etal.clone();
+			cv::Mat to_contur = etal.clone();
 			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_contur, conture_fig, -1, top_border_fig.top() + static_cast< int >( avarage_height ) + 1 );
 			if ( conture_fig.width() >= static_cast< int >( avarage_height ) ) // если широкая фигура, то скорее всего захватили рамку
 			{
 				// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
-				Mat to_stable = etal.clone();
-				figure short_fig;
+				cv::Mat to_stable = etal.clone();
+                                Figure short_fig;
 				// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
 				add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
-				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
+				conture_fig = Figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
 			}
 			else if ( last_symbol && conture_fig.width() >= static_cast< int >( avarage_height * 0.80 ) ) // если последняя фигура, то могли захватить болтик черный
 			{
 				// Тут делаю обработку захвата болтика
-				conture_fig = figure( conture_fig.left(), conture_fig.left() + static_cast< int >( avarage_height * 0.60 ), conture_fig.top(), conture_fig.bottom() );
+				conture_fig = Figure( conture_fig.left(), conture_fig.left() + static_cast< int >( avarage_height * 0.60 ), conture_fig.top(), conture_fig.bottom() );
 			}
 		}
 		else
 		{
 			// центрируем фигуру по Х (вырезаем не большой кусок и определяем его центр)
-			Mat to_stable = etal.clone();
-			figure short_fig;
+			cv::Mat to_stable = etal.clone();
+                        Figure short_fig;
 			// если центр сильно уехал, этот фокус не сработает, т.к. мы опять захватим рамку
 			add_pixel_as_spy< stat_data_index >( nearest_black.second, nearest_black.first, to_stable, short_fig, nearest_black.second - static_cast< int >( avarage_height * 0.4 ), nearest_black.second + static_cast< int >( avarage_height * 0.4 ) );
 			if ( !short_fig.is_empty() )
 			{
-				conture_fig = figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
+				conture_fig = Figure( pair_int( short_fig.center().first, reg_center.second ), pair_int( static_cast< int >( avarage_height * 0.60 ), static_cast< int >( avarage_height ) ) );
 			}
 			else
 			{
-				conture_fig = figure();
+				conture_fig = Figure();
 			}
 		}
 		if ( !conture_fig.is_empty()
@@ -893,7 +835,7 @@ void search_region_symbol( found_number& number, const Mat& etal, const Mat& ori
 			&& static_cast< double >( conture_fig.width() ) > 0.2 * avarage_height
 			)
 		{
-			const pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
+			const std::pair< char, double > sym_sym = find_sym_nn( true, conture_fig, origin, stat_data );
 			number.m_figs.push_back( conture_fig );
 			number.m_number += sym_sym.first;
 			number.m_weight += static_cast< int >( sym_sym.second );
@@ -909,7 +851,7 @@ void search_region_symbol( found_number& number, const Mat& etal, const Mat& ori
 	}
 }
 
-pair_int calc_center( const vector< figure >& figs, const vector< vector< pair_doub > >& data, int index )
+pair_int calc_center( const FigureGroup& figs, const std::vector< std::vector< pair_doub > >& data, int index )
 {
 	const static size_t figs_size = 6;
 	assert( figs.size() >= figs_size );
@@ -922,7 +864,7 @@ pair_int calc_center( const vector< figure >& figs, const vector< vector< pair_d
 	return ret;
 }
 
-void apply_angle( const vector< figure >& figs, vector< vector< pair_doub > >& data, double avarage_height, double sin_avarage_angle_by_y )
+void apply_angle( const FigureGroup& figs, std::vector< std::vector< pair_doub > >& data, double avarage_height, double sin_avarage_angle_by_y )
 {
 	// перемножаем все коэффициенты что бы получить реальное значение смещения в пикселях
 	const double diff_by_x_2_sym = data[ 0 ][ 0 ].first - data[ data.size() - 1 ][ 0 ].first;
@@ -938,9 +880,9 @@ void apply_angle( const vector< figure >& figs, vector< vector< pair_doub > >& d
 	}
 }
 
-vector< vector< pair_doub > > get_2_sym_reg_koef( const vector< figure >& figs, double avarage_height, double sin_avarage_angle_by_y )
+std::vector< std::vector< pair_doub > > get_2_sym_reg_koef( const FigureGroup& figs, double avarage_height, double sin_avarage_angle_by_y )
 {
-	vector< vector< pair_doub > > ret;
+	std::vector< std::vector< pair_doub > > ret;
 	fill_reg( ret, 6.7656, -0.4219, 7.5363, -0.3998 );
 	fill_reg( ret, 5.6061, -0.2560, 6.3767, -0.2338 );
 	fill_reg( ret, 4.6016, -0.2991, 5.3721, -0.2769 );
@@ -951,9 +893,9 @@ vector< vector< pair_doub > > get_2_sym_reg_koef( const vector< figure >& figs, 
 	return ret;
 }
 
-vector< vector< pair_doub > > get_3_sym_reg_koef( const vector< figure >& figs, double avarage_height, double sin_avarage_angle_by_y )
+std::vector< std::vector< pair_doub > > get_3_sym_reg_koef( const FigureGroup& figs, double avarage_height, double sin_avarage_angle_by_y )
 {
-	vector< vector< pair_doub > > ret;
+	std::vector< std::vector< pair_doub > > ret;
 	fill_reg( ret, 5.8903, -0.3631, 6.6165, -0.3631, 7.3426, -0.3631 );
 	fill_reg( ret, 4.9220, -0.2017, 5.6482, -0.2017, 6.3744, -0.2017 );
 	fill_reg( ret, 3.9537, -0.2421, 4.6799, -0.2421, 5.4061, -0.2421 );
@@ -965,7 +907,7 @@ vector< vector< pair_doub > > get_3_sym_reg_koef( const vector< figure >& figs, 
 }
 
 // выбираем что лучше подходит 2-х или 3-х символьный регион
-vector< sym_info > select_sym_info( const vector< sym_info >& fs2, const vector< sym_info >& fs3 )
+std::vector< sym_info > select_sym_info( const std::vector< sym_info >& fs2, const std::vector< sym_info >& fs3 )
 {
 	assert( fs2.size() == 2U );
 	assert( fs3.size() == 3U );
@@ -990,7 +932,7 @@ bool not_in_char_distance( int val )
 
 bool compare_regions( const found_number& lh, const found_number& rh )
 {
-	const bool lh_in_reg_list = region_codes().find( lh.m_number ) != region_codes().end();
+/*	const bool lh_in_reg_list = region_codes().find( lh.m_number ) != region_codes().end();
 	const bool rh_in_reg_list = region_codes().find( rh.m_number ) != region_codes().end();
 	if ( lh_in_reg_list != rh_in_reg_list )
 	{
@@ -1008,23 +950,24 @@ bool compare_regions( const found_number& lh, const found_number& rh )
 		{
 			return lh.m_weight < rh.m_weight;
 		}
-	}
+	}*/
+	return false;
 }
 
-pair_int get_pos_next_in_region( const vector< figure >& figs, const vector< vector< pair_doub > >& move_reg, const int index, const found_number& number, const double avarage_height )
+pair_int get_pos_next_in_region( const FigureGroup& figs, const std::vector< std::vector< pair_doub > >& move_reg, const int index, const found_number& number, const double avarage_height )
 {
 	pair_int ret = calc_center( figs, move_reg, index );
 	if ( number.m_number.at( number.m_number.size() - 1 ) != '?' )
 	{
-		return number.m_figs.at( number.m_figs.size() - 1 ).center() + make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
+		return number.m_figs.at( number.m_figs.size() - 1 ).center() + std::make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
 	}
 	return ret;
 }
 
 template< int stat_data_index >
-void search_region( found_number& best_number, const int best_level, const Mat& original, number_data& stat_data )
+void search_region( found_number& best_number, const int best_level, const cv::Mat& original, number_data& stat_data )
 {
-	const vector< figure >& figs = best_number.m_figs;
+	const FigureGroup& figs = best_number.m_figs;
 	if ( figs.size() != 6 ) // ищем регион только если у нас есть все 6 символов
 	{
 		return;
@@ -1036,10 +979,10 @@ void search_region( found_number& best_number, const int best_level, const Mat& 
 		+ static_cast< double >( figs.at( 1 ).height() + figs.at( 2 ).height() + figs.at( 3 ).height() ) * koef_height / 3. ) / 2.;
 
 	// ищем угол наклона по высоте (считаем среднее между не соседними фигурами 0-4, 0-5, 1-3)
-	vector< pair_int > index_fig_to_angle;
-	index_fig_to_angle.push_back( make_pair( 0, 4 ) );
-	index_fig_to_angle.push_back( make_pair( 0, 5 ) );
-	index_fig_to_angle.push_back( make_pair( 1, 3 ) );
+	std::vector< pair_int > index_fig_to_angle;
+	index_fig_to_angle.push_back( std::make_pair( 0, 4 ) );
+	index_fig_to_angle.push_back( std::make_pair( 0, 5 ) );
+	index_fig_to_angle.push_back( std::make_pair( 1, 3 ) );
 	double avarage_angle_by_y = 0.; // средний угол наклона номера по оси У
 	int move_by_y = 0; // номер наклонен вверх или вниз
 	for ( size_t nn = 0; nn < index_fig_to_angle.size(); ++nn )
@@ -1051,7 +994,7 @@ void search_region( found_number& best_number, const int best_level, const Mat& 
 	avarage_angle_by_y = avarage_angle_by_y / static_cast< double >( index_fig_to_angle.size() );
 	const double sin_avarage_angle_by_y = sin( avarage_angle_by_y );
 
-	vector< int > levels_to_iterate;
+	std::vector< int > levels_to_iterate;
 	for ( int nn = best_level - 20; nn <= best_level + 20; nn += 10 )
 	{
 		levels_to_iterate.push_back( nn );
@@ -1059,13 +1002,13 @@ void search_region( found_number& best_number, const int best_level, const Mat& 
 	levels_to_iterate.erase( remove_if( levels_to_iterate.begin(), levels_to_iterate.end(), &not_in_char_distance ), levels_to_iterate.end() );
 //	levels_to_iterate.push_back( best_level + 10 );
 
-	vector< found_number > nums;
+	std::vector< found_number > nums;
 	for ( size_t nn = 0; nn < levels_to_iterate.size(); ++nn )
 	{
-		Mat etal = original > levels_to_iterate.at( nn );
+		cv::Mat etal = original > levels_to_iterate.at( nn );
 		{
 			found_number fs2;
-			const vector< vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
+			const std::vector< std::vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
 			search_region_symbol< stat_data_index >( fs2, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data );
 			const pair_int next_2 = get_pos_next_in_region( figs, move_reg_by_2_sym_reg, 1, fs2, avarage_height );
 			search_region_symbol< stat_data_index >( fs2, etal, original, next_2, avarage_height, true, stat_data );
@@ -1073,27 +1016,27 @@ void search_region( found_number& best_number, const int best_level, const Mat& 
 		}
 		{
 			found_number fs3;
-			const vector< vector< pair_doub > > move_reg_by_3_sym_reg( get_3_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
+			const std::vector< std::vector< pair_doub > > move_reg_by_3_sym_reg( get_3_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
 			search_region_symbol< stat_data_index >( fs3, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data );
 			const pair_int next_2 = get_pos_next_in_region( figs, move_reg_by_3_sym_reg, 1, fs3, avarage_height );
 /*			pair_int next_2 = calc_center( figs, move_reg_by_3_sym_reg, 1 );
 			if ( fs3.m_number.at( fs3.m_number.size() - 1 ) != '?' )
 			{
-				next_2 = fs3.m_figs.at( fs3.m_figs.size() - 1 ).center() + make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
+				next_2 = fs3.m_figs.at( fs3.m_figs.size() - 1 ).center() + std::make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
 			}*/
 			search_region_symbol< stat_data_index >( fs3, etal, original, next_2, avarage_height, false, stat_data );
 			const pair_int next_3 = get_pos_next_in_region( figs, move_reg_by_3_sym_reg, 2, fs3, avarage_height );
 /*			pair_int next_3 = calc_center( figs, move_reg_by_3_sym_reg, 2 );
 			if ( fs3.m_number.at( fs3.m_number.size() - 1 ) != '?' )
 			{
-				next_3 = fs3.m_figs.at( fs3.m_figs.size() - 1 ).center() + make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
+				next_3 = fs3.m_figs.at( fs3.m_figs.size() - 1 ).center() + std::make_pair( static_cast< int >( 0.75 * avarage_height ), 0 );
 			}*/
 			search_region_symbol< stat_data_index >( fs3, etal, original, next_3, avarage_height, true, stat_data );
 			nums.push_back( fs3 );
 		}
 	}
 	sort( nums.begin(), nums.end(), &compare_regions );
-	vector< found_number >::const_iterator it = max_element( nums.begin(), nums.end(), &compare_regions );
+	std::vector< found_number >::const_iterator it = max_element( nums.begin(), nums.end(), &compare_regions );
 
 	best_number.m_number.append( it->m_number );
 	best_number.m_weight += it->m_weight;
@@ -1104,23 +1047,21 @@ void search_region( found_number& best_number, const int best_level, const Mat& 
 
 }
 
-found_number read_number( const Mat& image, int gray_step )
-{
-	if ( gray_step <= 0 || gray_step >= 256 )
-		gray_step = 10;
+found_number read_number(const cv::Mat& image, int gray_step) {
+  if (gray_step <= 0 || gray_step >= 256)
+    gray_step = 10;
 
-	vector< int > search_levels;
-	for ( int nn = gray_step; nn < 255; nn += gray_step )
-	{
-		search_levels.push_back( nn );
-	}
+  std::vector<int> search_levels;
+  for (int nn = gray_step; nn < 255; nn += gray_step) {
+    search_levels.push_back( nn );
+  }
 
-	return read_number_loop( image, search_levels );
+  return read_number_loop(image, search_levels);
 }
 
-found_number read_number_by_level( const Mat& image, int gray_level )
+found_number read_number_by_level( const cv::Mat& image, int gray_level )
 {
-	vector< int > search_levels;
+	std::vector< int > search_levels;
 	if ( gray_level <= 0 || gray_level >= 256 )
 		gray_level = 127;
 
@@ -1128,7 +1069,7 @@ found_number read_number_by_level( const Mat& image, int gray_level )
 	return read_number_loop( image, search_levels );
 }
 
-void remove_single_pixels( Mat& mat )
+void remove_single_pixels( cv::Mat& mat )
 {
 	for ( int nn = 0; nn < mat.rows; ++nn )
 	{
@@ -1158,43 +1099,61 @@ void remove_single_pixels( Mat& mat )
 	}
 }
 
-template< int stat_data_index >
-vector< found_number > read_number_impl( const Mat& input, int gray_level, number_data& stat_data )
-{
-	const Mat& gray_image = create_gray_image( input );
-	Mat img_bw = gray_image > gray_level;
-	Mat img_to_rez = img_bw.clone();
-	//	remove_single_pixels( img_bw );
-	// ищем фигуры
-	vector< figure > figs = parse_to_figures< stat_data_index >( img_bw );
-	// бьем по группам в зависимости от угла наклона элементов отностительно друг друга
-	vector< figure_group > groups = make_groups( figs );
-	// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не шире 7 * ширина первого элемента
-	figs_remote_too_long_by_x_from_first( groups );
-	// выкидываем элементы, которые слишком далеко по высоте от предыдущего
-	figs_remote_too_long_by_y_from_first( groups );
-	// выкидываем элементы, не пропорциональные первому элементу
-	figs_remove_invalid_from_first_by_size( groups );
-	// Выкидываем группы, которые включают в себя другие группы
-	groups_remove_included( groups );
-	// сливаем пересекающиеся группы
-	groups_merge_intersects( groups );
-	// ищем номера
-	const vector< found_number > nums = search_number( img_to_rez, groups, gray_image, stat_data );
-	return nums;
+void ReplaceBlackWhite(cv::Mat& input) {
+  for (int nn = 0; nn < input.rows; ++nn) {
+    for (int mm = 0; mm < input.cols; ++mm) {
+      switch (input.at<unsigned char>(nn, mm)) {
+        case 0:
+          input.at<unsigned char>(nn, mm) = 255;
+          break;
+        case 255:
+          input.at<unsigned char>(nn, mm) = 0;
+          break;
+        default:
+          assert(!"invalid color");
+          break;
+      }
+    }
+  }
 }
 
-found_number read_number_loop( const Mat& input, const vector< int >& search_levels )
+template<int stat_data_index>
+std::vector<found_number> read_number_impl(const cv::Mat& input, int gray_level, number_data& stat_data) {
+  const cv::Mat& gray_image = create_gray_image(input);
+  cv::Mat img_bw = gray_image > gray_level;
+  cv::Mat img_to_rez = img_bw.clone();
+  // remove_single_pixels( img_bw );
+  ReplaceBlackWhite(img_bw); // конвертим для сингапура
+  FigureGroup figs = ParseToFigures<stat_data_index>(img_bw);
+  std::vector<FigureGroup> groups = MakeGroupsByAngle(figs);
+  // удаляем лишнее по ширине
+  RemoteTooFarFromFirst(groups, 7, std::bind(&Figure::left, std::placeholders::_1));
+  // удаляем лишнее по длине
+  RemoteTooFarFromFirst(groups, 3, std::bind(&Figure::left, std::placeholders::_1));
+  // выкидываем элементы, не пропорциональные первому элементу
+  RemoveNotFitToFirstByHeight(groups);
+  // выкидываем группы, которые включаются в другие группы
+  RemoveIncludedGroups(groups);
+  // сливаем пересекающиеся группы
+  MergeIntersectsGroups(groups);
+  cv::Mat deb = input.clone();
+  DrawGroupsFigures(deb, groups, CV_RGB(255, 0, 0));
+  // ищем номера
+  const std::vector<found_number> nums = RecognizeNumber(img_to_rez, groups, gray_image, stat_data);
+  return nums;
+}
+
+found_number read_number_loop( const cv::Mat& input, const std::vector< int >& search_levels )
 {
 	found_number ret;
 	const int free_index = get_free_index();
 	try
 	{
 		number_data stat_data;
-		vector< found_number > found_nums;
+		std::vector< found_number > found_nums;
 		for ( size_t nn = 0; nn < search_levels.size(); ++nn )
 		{
-			vector< found_number > cur_nums;
+			std::vector< found_number > cur_nums;
 			switch ( free_index )
 			{
 			case 0:
@@ -1222,7 +1181,7 @@ found_number read_number_loop( const Mat& input, const vector< int >& search_lev
 				cur_nums = read_number_impl< 7 >( input, search_levels.at( nn ), stat_data );
 				break;
 			default:
-				throw runtime_error( "invalid data index" );
+				throw std::runtime_error( "invalid data index" );
 			};
 
 			if ( cur_nums.empty() )
@@ -1239,7 +1198,7 @@ found_number read_number_loop( const Mat& input, const vector< int >& search_lev
 		if ( best_index != -1 )
 		{
 			found_number& best_number = found_nums.at( best_index );
-			const Mat& gray_image = create_gray_image( input );
+			const cv::Mat& gray_image = create_gray_image( input );
 			const int& best_level = search_levels.at( best_index ) - 10;
 			switch ( free_index )
 			{
@@ -1268,7 +1227,7 @@ found_number read_number_loop( const Mat& input, const vector< int >& search_lev
 				search_region< 7 >( best_number, best_level, gray_image, stat_data );
 				break;
 			default:
-				throw runtime_error( "invalid data index" );
+				throw std::runtime_error( "invalid data index" );
 			};
 
 			ret = best_number;

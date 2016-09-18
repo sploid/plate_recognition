@@ -14,25 +14,19 @@ namespace cv
 // @todo: переделать мепинг символов к индексам массива, свитч лажа
 // @todo: при распознавании символа, растянуть всю область, что бы убрать белый бордер, если он есть
 // @todo: сделать перебор g_points_dublicate_first итераторами, а не индексами
+// @todo: внести в настройки угол наклона номера
 
 // @todo: M520PX190.jpg - большой угол и слева шуруп, поэтому левая буква М не распознается
 
 // найденный номер
-struct found_number
-{
-	found_number()
-		: m_number( std::string() )
-		, m_weight( -1 )
-	{
-	}
-	std::string m_number;		// номер
-	int m_weight;			// вес
-	std::vector< figure > m_figs;
+struct found_number {
+  std::string m_number;		// номер
+  int m_weight = -1;		// вес
+  FigureGroup m_figs;
 
-	std::pair< std::string, int > to_pair() const
-	{
-		return std::make_pair( m_number, m_weight );
-	}
+  std::pair<std::string, int> to_pair() const {
+    return std::make_pair( m_number, m_weight );
+  }
 
 	bool operator < ( const found_number& other ) const
 	{

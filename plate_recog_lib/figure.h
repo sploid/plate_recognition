@@ -1,46 +1,44 @@
 #pragma once
 #include <vector>
-#include "utils.h"
+#include <opencv2/opencv.hpp>
 
-class figure
-{
+class Figure {
 public:
-	figure()
-		: m_left( -1 )
-		, m_right( -1 )
-		, m_top( -1 )
-		, m_bottom( -1 )
-		, m_too_big( false )
-	{
-	}
-	figure( pair_int center, pair_int size )
-		: m_left( center.first - size.first / 2 - 1 )
-		, m_right( center.first + size.first / 2 + 1 )
-		, m_top( center.second - size.second / 2 - 1 )
-		, m_bottom( center.second + size.second / 2 + 1 )
-		, m_too_big( false )
-	{
-	}
-	figure( int left, int right, int top, int bottom )
-		: m_left( left )
-		, m_right( right )
-		, m_top( top )
-		, m_bottom( bottom )
-	{
-	}
-	int width() const
-	{
-		return m_right - m_left;
-	}
-	int height() const
-	{
-		return m_bottom - m_top;
-	}
+  Figure()
+    : m_left(-1),
+      m_right(-1 ),
+      m_top(-1),
+      m_bottom(-1),
+      m_too_big(false) {
+  }
+
+  Figure(const std::pair<int, int>& center, const std::pair<int, int>& size)
+    : m_left(center.first - size.first / 2 - 1),
+      m_right(center.first + size.first / 2 + 1),
+      m_top(center.second - size.second / 2 - 1),
+      m_bottom(center.second + size.second / 2 + 1),
+      m_too_big(false) {
+  }
+
+  Figure(int left, int right, int top, int bottom)
+    : m_left( left ),
+      m_right( right ),
+      m_top( top ),
+      m_bottom( bottom ) {
+  }
+
+  int width() const {
+    return m_right - m_left;
+  }
+
+  int height() const {
+    return m_bottom - m_top;
+  }
 	bool is_empty() const
 	{
 		return m_left == -1 && m_right == -1 && m_top == -1 && m_bottom == -1;
 	}
-	void add_point( const pair_int& val )
+	void add_point(const std::pair<int, int>& val)
 	{
 		if ( too_big() )
 			return;
@@ -65,13 +63,20 @@ public:
 			m_too_big = true;
 		}
 	}
-	pair_int center() const
+
+        cv::Point2i CenterCV() const {
+          const int hor = m_left + (m_right - m_left) / 2;
+          const int ver = m_top + (m_bottom - m_top) / 2;
+          return cv::Point2i(hor, ver);
+        }
+
+        std::pair<int, int> center() const
 	{
 		const int hor = m_left + ( m_right - m_left ) / 2;
 		const int ver = m_top + ( m_bottom - m_top ) / 2;
 		return std::make_pair( hor, ver );
 	}
-	pair_int top_left() const
+        std::pair<int, int> top_left() const
 	{
 		return std::make_pair( left(), top() );
 	}
@@ -91,7 +96,7 @@ public:
 	{
 		return m_bottom;
 	}
-	pair_int bottom_right() const
+        std::pair<int, int> bottom_right() const
 	{
 		return std::make_pair( right(), bottom() );
 	}
@@ -103,7 +108,7 @@ public:
 	{
 		return m_too_big;
 	}
-	bool operator<( const figure & other ) const
+	bool operator<( const Figure & other ) const
 	{
 		if ( m_left != other.m_left )
 			return m_left < other.m_left;
@@ -116,7 +121,7 @@ public:
 		else
 			return false;
 	}
-	bool operator==( const figure & other ) const
+	bool operator==( const Figure & other ) const
 	{
 		return m_left == other.m_left
 			&& m_right == other.m_right
@@ -133,4 +138,4 @@ private:
 };
 
 //typedef std::map< std::pair< bool, figure >, std::pair< char, double > > clacs_figs_type;
-typedef std::vector< figure > figure_group;
+typedef std::vector<Figure> FigureGroup;
