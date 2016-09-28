@@ -2,10 +2,15 @@
 #include <assert.h>
 #include <functional>
 #include <stdexcept>
+
 #include <opencv2/opencv.hpp>
+#include <baseapi.h>
+//#include <leptonica/allheaders.h>
+
 #include "sym_recog.h"
 #include "utils.h"
 #include "figure.h"
+#include "binarizewolfjolion.h"
 
 struct number_data
 {
@@ -90,7 +95,7 @@ void set_free_index( int index )
 
 const int kMinGroupSize = 4;
 
-found_number read_number_loop( const cv::Mat& input, const std::vector< int >& search_levels );
+FoundNumber read_number_loop( const cv::Mat& input, const std::vector< int >& search_levels );
 
 inline pair_int operator - ( const pair_int& lh, const pair_int& rh )
 {
@@ -415,7 +420,7 @@ void RemoveNotFitToFirstByHeight( std::vector< FigureGroup > & groups ) {
     for (int mm = cur_group_iter->size() - 1; mm >= 1; --mm) {
       const Figure& cur_fig = cur_group_iter->at(mm);
       const double height_cur = cur_fig.bottom() - cur_fig.top();
-      if (height_cur > height_first * 1.5 || height_cur < height_first * 0.6) {
+      if (height_cur > height_first * 1.2 || height_cur < height_first * 0.8) {
         cur_group_iter->erase(cur_group_iter->begin() + mm);
       }
     }
@@ -501,12 +506,12 @@ struct found_symbol
 	double weight;
 };
 
-found_number find_best_number_by_weight( const std::vector< found_number >& vals, const cv::Mat* etal = 0 )
+FoundNumber find_best_number_by_weight( const std::vector< FoundNumber >& vals, const cv::Mat* etal = 0 )
 {
 	(void)etal;
 	assert( !vals.empty() );
 	if ( vals.empty() )
-		return found_number();
+		return FoundNumber();
 	size_t best_index = 0;
 	for ( size_t nn = 1; nn < vals.size(); ++nn )
 	{
@@ -532,10 +537,10 @@ found_number find_best_number_by_weight( const std::vector< found_number >& vals
 	return vals[ best_index ];
 }
 
-found_number create_number_by_pos( const std::vector< pair_int >& pis, const std::vector< found_symbol >& figs_by_pos )
+FoundNumber create_number_by_pos( const std::vector< pair_int >& pis, const std::vector< found_symbol >& figs_by_pos )
 {
 	assert( pis.size() == 6 );
-	found_number ret;
+        FoundNumber ret;
 	for ( size_t oo = 0; oo < pis.size(); ++oo )
 	{
 		bool found = false;
@@ -592,16 +597,59 @@ std::vector< found_symbol > figs_search_syms( const std::vector< pair_int >& pis
 	return ret;
 }
 
-found_number RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, const cv::Mat& original, number_data& stat_data) {
-  found_number result;
+// @todo (sploid): refactor for support output with several symbols
+std::pair<char, int> RecognizeSymbol(const cv::Mat& img) {
+  static tesseract::TessBaseAPI* api = nullptr;
+  if (!api) {
+    api = new tesseract::TessBaseAPI();
+    const int init_res = api->Init("C:\\soft\\alpr\\tess-install\\tessdata", "eng");
+    api->SetVariable("tessedit_char_whitelist", "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+    api->SetVariable("save_blob_choices", "T");
+    api->SetPageSegMode(tesseract::PSM_SINGLE_CHAR);
+  }
+  //  api->SetImage(etal.data, etal.size().width, etal.size().height, etal.channels(), etal.step1());
+
+  //    api->SetRectangle(next.left(), next.top(), next.width(), next.height());
+  api->SetImage(img.data, img.size().width, img.size().height, img.channels(), img.step1());
+  const int rec_result = api->Recognize(NULL);
+
+  tesseract::ResultIterator* ri = api->GetIterator();
+  tesseract::PageIteratorLevel level = tesseract::RIL_SYMBOL;
+  std::pair<char, int> res = std::make_pair(FoundNumber::kUnknownSym, 0);
+  if (ri) {
+    const char* symbol = ri->GetUTF8Text(level);
+    if (symbol) {
+      if (*symbol != ' ') {
+        const float conf = ri->Confidence(level);
+        res = std::make_pair(*symbol, static_cast<int>(conf * 10));
+      }
+      delete[] symbol;
+    }
+  }
+  return res;
+}
+
+FoundNumber RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, const cv::Mat& original, number_data& stat_data) {
+  FoundNumber result;
+
+  for (const auto& next : group) {
+    const cv::Mat copy = etal(cv::Rect(next.left(), next.top(), next.width() + 1, next.height() + 1)).clone();
+    const std::pair<char, int> rec_res = RecognizeSymbol(copy);
+    result.m_number += rec_res.first;
+    result.m_weight += rec_res.second;
+    result.m_figs.push_back(next);
+  }
+
+  assert(result.m_number.size() == group.size());
+
   return result;
 }
 
-std::vector<found_number> RecognizeNumber(cv::Mat& etal, std::vector<FigureGroup>& groups, const cv::Mat& original, number_data& stat_data) {
+std::vector<FoundNumber> RecognizeNumber(cv::Mat& etal, std::vector<FigureGroup>& groups, const cv::Mat& original, number_data& stat_data) {
   // ищем позиции фигур и соответсвующие им символы
-  std::vector<found_number> ret;
+  std::vector<FoundNumber> ret;
   for (size_t nn = 0; nn < groups.size(); ++nn) {
-    const found_number fn = RecognizeNumberByGroup(etal, groups.at(nn), original, stat_data);
+    const FoundNumber fn = RecognizeNumberByGroup(etal, groups.at(nn), original, stat_data);
     if (fn.is_valid()) {
       ret.push_back(fn);
     }
@@ -635,21 +683,19 @@ std::vector<found_number> RecognizeNumber(cv::Mat& etal, std::vector<FigureGroup
   return ret;
 }
 
-int fine_best_index( const std::vector< found_number >& found_nums )
-{
-	if ( found_nums.empty() )
-		return -1;
-	else if ( found_nums.size() == 1U )
-		return 0;
-	int ret = 0;
-	for ( size_t nn = 1; nn < found_nums.size(); ++nn )
-	{
-		if ( found_nums.at( ret ) < found_nums.at( nn ) )
-		{
-			ret = nn;
-		}
-	}
-	return ret;
+int fine_best_index(const std::vector<FoundNumber>& found_nums) {
+  if (found_nums.empty()) {
+    return -1;
+  } else if (found_nums.size() == 1U) {
+    return 0;
+  }
+  int ret = 0;
+  for (size_t nn = 1; nn < found_nums.size(); ++nn) {
+    if (found_nums.at(ret) < found_nums.at(nn)) {
+      ret = static_cast<int>(nn);
+    }
+  }
+  return ret;
 }
 
 cv::Mat create_gray_image( const cv::Mat& input )
@@ -779,7 +825,7 @@ struct sym_info
 };
 
 template< int stat_data_index >
-void search_region_symbol( found_number& number, const cv::Mat& etal, const cv::Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
+void search_region_symbol(FoundNumber& number, const cv::Mat& etal, const cv::Mat& origin, const pair_int& reg_center, const double avarage_height, bool last_symbol, number_data& stat_data )
 {
 //	number.m_figs.push_back( Figure( reg_center, std::make_pair( 1, 1 ) ) );
 	const pair_int nearest_black = search_nearest_black( etal, reg_center );
@@ -930,7 +976,7 @@ bool not_in_char_distance( int val )
 	return val <= 0 || val >= 255;
 }
 
-bool compare_regions( const found_number& lh, const found_number& rh )
+bool compare_regions( const FoundNumber& lh, const FoundNumber& rh )
 {
 /*	const bool lh_in_reg_list = region_codes().find( lh.m_number ) != region_codes().end();
 	const bool rh_in_reg_list = region_codes().find( rh.m_number ) != region_codes().end();
@@ -954,7 +1000,7 @@ bool compare_regions( const found_number& lh, const found_number& rh )
 	return false;
 }
 
-pair_int get_pos_next_in_region( const FigureGroup& figs, const std::vector< std::vector< pair_doub > >& move_reg, const int index, const found_number& number, const double avarage_height )
+pair_int get_pos_next_in_region( const FigureGroup& figs, const std::vector< std::vector< pair_doub > >& move_reg, const int index, const FoundNumber& number, const double avarage_height )
 {
 	pair_int ret = calc_center( figs, move_reg, index );
 	if ( number.m_number.at( number.m_number.size() - 1 ) != '?' )
@@ -965,7 +1011,7 @@ pair_int get_pos_next_in_region( const FigureGroup& figs, const std::vector< std
 }
 
 template< int stat_data_index >
-void search_region( found_number& best_number, const int best_level, const cv::Mat& original, number_data& stat_data )
+void search_region(FoundNumber& best_number, const int best_level, const cv::Mat& original, number_data& stat_data )
 {
 	const FigureGroup& figs = best_number.m_figs;
 	if ( figs.size() != 6 ) // ищем регион только если у нас есть все 6 символов
@@ -1002,12 +1048,12 @@ void search_region( found_number& best_number, const int best_level, const cv::M
 	levels_to_iterate.erase( remove_if( levels_to_iterate.begin(), levels_to_iterate.end(), &not_in_char_distance ), levels_to_iterate.end() );
 //	levels_to_iterate.push_back( best_level + 10 );
 
-	std::vector< found_number > nums;
+	std::vector< FoundNumber > nums;
 	for ( size_t nn = 0; nn < levels_to_iterate.size(); ++nn )
 	{
 		cv::Mat etal = original > levels_to_iterate.at( nn );
 		{
-			found_number fs2;
+                  FoundNumber fs2;
 			const std::vector< std::vector< pair_doub > > move_reg_by_2_sym_reg( get_2_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
 			search_region_symbol< stat_data_index >( fs2, etal, original, calc_center( figs, move_reg_by_2_sym_reg, 0 ), avarage_height, false, stat_data );
 			const pair_int next_2 = get_pos_next_in_region( figs, move_reg_by_2_sym_reg, 1, fs2, avarage_height );
@@ -1015,7 +1061,7 @@ void search_region( found_number& best_number, const int best_level, const cv::M
 			nums.push_back( fs2 );
 		}
 		{
-			found_number fs3;
+                  FoundNumber fs3;
 			const std::vector< std::vector< pair_doub > > move_reg_by_3_sym_reg( get_3_sym_reg_koef( figs, avarage_height, sin_avarage_angle_by_y ) );
 			search_region_symbol< stat_data_index >( fs3, etal, original, calc_center( figs, move_reg_by_3_sym_reg, 0 ), avarage_height, false, stat_data );
 			const pair_int next_2 = get_pos_next_in_region( figs, move_reg_by_3_sym_reg, 1, fs3, avarage_height );
@@ -1036,7 +1082,7 @@ void search_region( found_number& best_number, const int best_level, const cv::M
 		}
 	}
 	sort( nums.begin(), nums.end(), &compare_regions );
-	std::vector< found_number >::const_iterator it = max_element( nums.begin(), nums.end(), &compare_regions );
+	std::vector< FoundNumber >::const_iterator it = max_element( nums.begin(), nums.end(), &compare_regions );
 
 	best_number.m_number.append( it->m_number );
 	best_number.m_weight += it->m_weight;
@@ -1047,7 +1093,7 @@ void search_region( found_number& best_number, const int best_level, const cv::M
 
 }
 
-found_number read_number(const cv::Mat& image, int gray_step) {
+FoundNumber read_number(const cv::Mat& image, int gray_step) {
   if (gray_step <= 0 || gray_step >= 256)
     gray_step = 10;
 
@@ -1059,7 +1105,7 @@ found_number read_number(const cv::Mat& image, int gray_step) {
   return read_number_loop(image, search_levels);
 }
 
-found_number read_number_by_level( const cv::Mat& image, int gray_level )
+FoundNumber read_number_by_level( const cv::Mat& image, int gray_level )
 {
 	std::vector< int > search_levels;
 	if ( gray_level <= 0 || gray_level >= 256 )
@@ -1117,14 +1163,45 @@ void ReplaceBlackWhite(cv::Mat& input) {
   }
 }
 
+void RemoveTooNarrowFigures(FigureGroup& figs) {
+  for (int nn = static_cast<int>(figs.size() - 1); nn >= 0; --nn) {
+    assert(figs.at(nn).width() && figs.at(nn).height());
+    const float diff = static_cast<float>(figs.at(nn).width()) / static_cast<float>(figs.at(nn).height());
+    const float kMinDiff = 0.1;
+    if (diff < kMinDiff) {
+      figs.erase(figs.begin() + nn);
+    }
+  }
+}
+
 template<int stat_data_index>
-std::vector<found_number> read_number_impl(const cv::Mat& input, int gray_level, number_data& stat_data) {
+std::vector<FoundNumber> ReadNumberImpl(const cv::Mat& input, int gray_level, number_data& stat_data) {
   const cv::Mat& gray_image = create_gray_image(input);
   cv::Mat img_bw = gray_image > gray_level;
-  cv::Mat img_to_rez = img_bw.clone();
-  // remove_single_pixels( img_bw );
-  ReplaceBlackWhite(img_bw); // конвертим для сингапура
-  FigureGroup figs = ParseToFigures<stat_data_index>(img_bw);
+
+  cv::Mat iii1 = img_bw.clone();
+  NiblackSauvolaWolfJolion(gray_image, iii1, WOLFJOLION, gray_level / 10, gray_level / 10, 0.05);
+//  cv::Mat iii2 = img_bw.clone();
+//  NiblackSauvolaWolfJolion(gray_image, iii2, WOLFJOLION, 7, 7, 0.1);
+//  cv::Mat iii3 = img_bw.clone();
+//  NiblackSauvolaWolfJolion(gray_image, iii3, WOLFJOLION, 7, 7, 0.15);
+
+
+
+  //ReplaceBlackWhite(img_bw); // конвертим для сингапура
+  //cv::Mat img_to_recog = img_bw.clone();
+  //FigureGroup figs = ParseToFigures<stat_data_index>(img_bw);
+
+  ReplaceBlackWhite(iii1); // конвертим для сингапура
+  cv::Mat img_to_recog = iii1.clone();
+  FigureGroup figs = ParseToFigures<stat_data_index>(iii1);
+
+//  cv::Mat mama = input.clone();
+//  DrawFigures(mama, figs);
+
+
+  // выкидываем слишком узкие штуки
+  RemoveTooNarrowFigures(figs);
   std::vector<FigureGroup> groups = MakeGroupsByAngle(figs);
   // удаляем лишнее по ширине
   RemoteTooFarFromFirst(groups, 7, std::bind(&Figure::left, std::placeholders::_1));
@@ -1139,65 +1216,38 @@ std::vector<found_number> read_number_impl(const cv::Mat& input, int gray_level,
   cv::Mat deb = input.clone();
   DrawGroupsFigures(deb, groups, CV_RGB(255, 0, 0));
   // ищем номера
-  const std::vector<found_number> nums = RecognizeNumber(img_to_rez, groups, gray_image, stat_data);
+  const std::vector<FoundNumber> nums = RecognizeNumber(img_to_recog, groups, gray_image, stat_data);
   return nums;
 }
 
-found_number read_number_loop( const cv::Mat& input, const std::vector< int >& search_levels )
-{
-	found_number ret;
-	const int free_index = get_free_index();
-	try
-	{
-		number_data stat_data;
-		std::vector< found_number > found_nums;
-		for ( size_t nn = 0; nn < search_levels.size(); ++nn )
-		{
-			std::vector< found_number > cur_nums;
-			switch ( free_index )
-			{
-			case 0:
-				cur_nums = read_number_impl< 0 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 1:
-				cur_nums = read_number_impl< 1 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 2:
-				cur_nums = read_number_impl< 2 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 3:
-				cur_nums = read_number_impl< 3 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 4:
-				cur_nums = read_number_impl< 4 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 5:
-				cur_nums = read_number_impl< 5 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 6:
-				cur_nums = read_number_impl< 6 >( input, search_levels.at( nn ), stat_data );
-				break;
-			case 7:
-				cur_nums = read_number_impl< 7 >( input, search_levels.at( nn ), stat_data );
-				break;
-			default:
-				throw std::runtime_error( "invalid data index" );
-			};
+FoundNumber read_number_loop(const cv::Mat& input, const std::vector<int>& search_levels) {
+  std::vector<FoundNumber> all_nums;
+  const int free_index = get_free_index();
+  try {
+    number_data stat_data;
+    for (size_t nn = 0; nn < search_levels.size(); ++nn) {
+      std::vector<FoundNumber> cur_nums;
+      switch (free_index) {
+        case 0: cur_nums = ReadNumberImpl<0>(input, search_levels.at(nn), stat_data); break;
+        case 1: cur_nums = ReadNumberImpl<1>(input, search_levels.at(nn), stat_data); break;
+        case 2: cur_nums = ReadNumberImpl<2>(input, search_levels.at(nn), stat_data); break;
+        case 3: cur_nums = ReadNumberImpl<3>(input, search_levels.at(nn), stat_data); break;
+        case 4: cur_nums = ReadNumberImpl<4>(input, search_levels.at(nn), stat_data); break;
+        case 5: cur_nums = ReadNumberImpl<5>(input, search_levels.at(nn), stat_data); break;
+        case 6: cur_nums = ReadNumberImpl<6>(input, search_levels.at(nn), stat_data); break;
+        case 7: cur_nums = ReadNumberImpl<7>(input, search_levels.at(nn), stat_data); break;
+	default: throw std::runtime_error( "invalid data index" );
+      };
 
-			if ( cur_nums.empty() )
-			{
-				found_nums.push_back( found_number() );
-			}
-			else
-			{
-				found_nums.push_back( cur_nums.at( fine_best_index( cur_nums ) ) );
-			}
-		}
+      if (!cur_nums.empty()) {
+        all_nums.insert(all_nums.end(), cur_nums.begin(), cur_nums.end());
+//        found_nums.push_back(cur_nums.at(fine_best_index(cur_nums)));
+      }
+    }
 
-		const int best_index = fine_best_index( found_nums );
-		if ( best_index != -1 )
+/*  if ( best_index != -1 )
 		{
-			found_number& best_number = found_nums.at( best_index );
+                  FoundNumber& best_number = found_nums.at( best_index );
 			const cv::Mat& gray_image = create_gray_image( input );
 			const int& best_level = search_levels.at( best_index ) - 10;
 			switch ( free_index )
@@ -1231,11 +1281,30 @@ found_number read_number_loop( const cv::Mat& input, const std::vector< int >& s
 			};
 
 			ret = best_number;
-		}
-	}
-	catch ( const cv::Exception& )
-	{
-	}
-	set_free_index( free_index );
-	return ret;
+		}*/
+  } catch ( const cv::Exception& e) {
+    const char* tt = e.what();
+    int t = 0;
+  }
+  set_free_index(free_index);
+  const int best_index = fine_best_index(all_nums);
+  for (size_t nn = 0; nn < all_nums.size(); ++nn) {
+    cv::Mat ll = input.clone();
+    DrawFigures(ll, all_nums.at(nn).m_figs);
+//    cv::putText(ll, all_nums.at(nn).m_number + "  " + std::to_string(all_nums.at(nn).m_weight), cv::Point(20, 100), cv::FONT_HERSHEY_SIMPLEX, 1.0, CV_RGB(255, 0, 0), 2);
+    std::stringstream ss;
+    ss << "C:\\cache\\sing\\logs\\" << nn;
+    if (best_index == nn) {
+      ss << "b";
+    }
+    std::string num_with_star(all_nums.at(nn).m_number);
+    std::replace(num_with_star.begin(), num_with_star.end(), FoundNumber::kUnknownSym, '-');
+    ss << "  " << all_nums.at(nn).m_weight << "  " << num_with_star << ".jpg";
+    cv::imwrite(ss.str(), ll);
+  }
+  if (best_index == -1) {
+    return FoundNumber();
+  } else {
+    return all_nums.at(best_index);
+  }
 }

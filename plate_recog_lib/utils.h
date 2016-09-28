@@ -48,11 +48,11 @@ inline void draw_points( const std::vector< pair_int >& pis, const cv::Mat& etal
 }
 
 inline void DrawFigure(cv::Mat& output, const Figure& fig, const cv::Scalar& color) {
-  cv::rectangle(output, cv::Rect(cv::Point2i(fig.left(), fig.top()), cv::Point2i(fig.right(), fig.bottom())), color);
+  cv::rectangle(output, cv::Rect(cv::Point2i(fig.left(), fig.top()), cv::Point2i(fig.right() + 1, fig.bottom() + 1)), color);
 }
 
 template<class TFigures>
-void DrawFigures(cv::Mat& output, const TFigures& figures, const cv::Scalar& color, bool connect_centers = false) {
+void DrawFigures(cv::Mat& output, const TFigures& figures, const cv::Scalar& color = CV_RGB(255, 0, 0), bool connect_centers = false) {
   for (const auto& next : figures) {
     DrawFigure(output, next, color);
     if (connect_centers) {
@@ -107,60 +107,49 @@ private:
 	const int64 m_begin;
 };
 
-#ifdef QT_GUI
-inline QImage mat2qimage( const cv::Mat& mat, const QRect& rect = QRect() )
-{
-	using namespace cv;
-	const int height = mat.rows;
-	const int width = mat.cols;
-	Mat dest;
-	if ( rect.isNull() )
-	{
-		dest = mat;
-	}
-	else
-	{
-		cv::resize( mat, dest, cv::Size( 10, 10 ) );
-	}
-	if ( dest.depth() == CV_MAT_DEPTH( CV_8U ) && dest.channels() == 3 )
-	{
-		const QImage ret( static_cast<const uchar*>( dest.ptr() ), width, height, QImage::Format_RGB888 );
-		return ret.rgbSwapped();
-	}
-	else if ( dest.depth() == CV_MAT_DEPTH( CV_8U ) && dest.channels() == 1 )
-	{
-		QImage ret( width, height, QImage::Format_RGB32 );
-		for( int nn = 0; nn < height; ++nn )
-		{
-			for ( int mm = 0; mm < width; ++mm )
-			{
-				const unsigned char next_pixel = static_cast< int >( dest.at< unsigned char >( nn, mm ) );
-				ret.setPixel( mm, nn, qRgb( next_pixel, next_pixel, next_pixel ) );
-			}
-		}
-		return ret;
-	}
-	else if ( dest.depth() == CV_MAT_DEPTH( CV_32F ) && dest.channels() == 1 )
-	{
-		Q_ASSERT( !"I doubt that it works" );
-		QImage ret( width, height, QImage::Format_Indexed8 );
-		QVector< QRgb > colorTable;
-		for ( int i = 0; i < 256; ++i )
-		{
-			colorTable.push_back( qRgb( i, i, i ) );
-		}
-		ret.setColorTable( colorTable );
-		for( int nn = 0; nn < height; ++nn )
-		{
-			for ( int mm = 0; mm < width; ++mm )
-			{
-				const int next_pixel = static_cast< int >( dest.at< float >( nn, mm ) );
-				ret.setPixel( mm, nn, next_pixel );
-			}
-		}
-		return ret;
-	}
-	Q_ASSERT( !"not supported format" );
-	return QImage();
+#ifdef QT_GUI_LIB
+inline QImage mat2qimage(const cv::Mat& mat, const QRect& rect = QRect()) {
+  const int height = mat.rows;
+  const int width = mat.cols;
+  cv::Mat dest;
+  if (rect.isNull()) {
+    dest = mat;
+  } else {
+    cv::resize(mat, dest, cv::Size(10, 10));
+  }
+
+  if (dest.depth() == CV_MAT_DEPTH(CV_8U) && dest.channels() == 3) {
+    const QImage ret(static_cast<const uchar*>(dest.ptr()), width, height, dest.step, QImage::Format_RGB888);
+    return ret.rgbSwapped();
+
+  } else if (dest.depth() == CV_MAT_DEPTH(CV_8U) && dest.channels() == 1) {
+    QImage ret(width, height, QImage::Format_RGB32);
+    for(int nn = 0; nn < height; ++nn) {
+      for (int mm = 0; mm < width; ++mm) {
+        const unsigned char next_pixel = static_cast< int >( dest.at< unsigned char >( nn, mm ) );
+	ret.setPixel( mm, nn, qRgb( next_pixel, next_pixel, next_pixel ) );
+      }
+    }
+    return ret;
+
+  } else if (dest.depth() == CV_MAT_DEPTH(CV_32F) && dest.channels() == 1) {
+    Q_ASSERT( !"I doubt that it works" );
+    QImage ret(width, height, QImage::Format_Indexed8);
+    QVector<QRgb> color_table;
+    for (int i = 0; i < 256; ++i) {
+      color_table.push_back(qRgb(i, i, i));
+    }
+    ret.setColorTable(color_table);
+    for (int nn = 0; nn < height; ++nn) {
+      for (int mm = 0; mm < width; ++mm) {
+        const int next_pixel = static_cast<int>(dest.at<float>(nn, mm));
+        ret.setPixel(mm, nn, next_pixel);
+      }
+    }
+    return ret;
+  }
+
+  Q_ASSERT(!"not supported format");
+  return QImage();
 }
 #endif

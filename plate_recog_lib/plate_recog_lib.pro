@@ -15,8 +15,10 @@ HEADERS = \
 		sym_recog.h \
 		utils.h
 SOURCES = \
+		binarizewolfjolion.cpp \
 		engine.cpp \
 		sym_recog.cpp
 
 include(../opencv.pri)
 
+INCLUDEPATH += C:/soft/alpr/tesseract/api C:/soft/alpr/tesseract/ccmain C:/soft/alpr/tesseract/ccutil C:/soft/alpr/tesseract/ccstruct
