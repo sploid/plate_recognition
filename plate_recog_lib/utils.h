@@ -47,7 +47,7 @@ inline void draw_points( const std::vector< pair_int >& pis, const cv::Mat& etal
 	imwrite( next_name( key ), colored_rect );
 }
 
-inline void DrawFigure(cv::Mat& output, const Figure& fig, const cv::Scalar& color) {
+inline void DrawFigure(cv::Mat& output, const Figure& fig, const cv::Scalar& color = CV_RGB(255, 0, 0)) {
   cv::rectangle(output, cv::Rect(cv::Point2i(fig.left(), fig.top()), cv::Point2i(fig.right() + 1, fig.bottom() + 1)), color);
 }
 
@@ -63,7 +63,7 @@ void DrawFigures(cv::Mat& output, const TFigures& figures, const cv::Scalar& col
   }
 }
 
-inline void DrawGroupsFigures(cv::Mat& output, const std::vector<FigureGroup>& groups, const cv::Scalar& color) {
+inline void DrawGroupsFigures(cv::Mat& output, const std::vector<FigureGroup>& groups, const cv::Scalar& color = CV_RGB(255, 0, 0)) {
   for (const auto& next : groups) {
     DrawFigures(output, next, color, true);
   }

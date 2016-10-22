@@ -45,7 +45,7 @@ struct FoundNumber {
     if (m_number.empty()) {
       return kCountNotParsedSyms; // вообще ничего нет
     }
-    return std::count(m_number.begin(), m_number.end(), kUnknownSym);
+    return static_cast<int>(std::count(m_number.begin(), m_number.end(), kUnknownSym));
   }
 
   static const int kCountNotParsedSyms = 100;
@@ -53,5 +53,23 @@ struct FoundNumber {
 };
 
 
-FoundNumber read_number( const cv::Mat& image, int gray_step = 0 );
-FoundNumber read_number_by_level( const cv::Mat& image, int gray_level );
+FoundNumber read_number(const cv::Mat& image, int gray_step = 0);
+FoundNumber read_number_by_level(const cv::Mat& image, int gray_level);
+struct ParseToFigsResult {
+  cv::Mat bin_image;
+  int level;
+  FigureGroup figs;
+};
+ParseToFigsResult ParseToFigures(const cv::Mat& input, int level);
+std::vector<ParseToFigsResult> ParseToFigures(const cv::Mat& input, const std::vector<int>& levels);
+std::pair<cv::Mat, std::vector<FigureGroup>> ParseToGroups(const cv::Mat& input, int level);
+std::vector<FigureGroup> ProcessFoundGroups(int curr_level, const std::vector<FigureGroup>& input_groups, const std::vector<ParseToFigsResult>& other_figs);
+
+struct ParseToGroupWithProcessingResult {
+  cv::Mat img;
+  int level;
+  FigureGroup group;
+};
+
+std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const cv::Mat& input);
+

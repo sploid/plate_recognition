@@ -5,38 +5,40 @@
 class Figure {
 public:
   Figure()
-    : m_left(-1),
-      m_right(-1),
-      m_top(-1),
-      m_bottom(-1),
+    : left_(-1),
+      right_(-1),
+      top_(-1),
+      bottom_(-1),
       m_too_big(false) {
   }
 
   Figure(const std::pair<int, int>& center, const std::pair<int, int>& size)
-    : m_left(center.first - size.first / 2 - 1),
-      m_right(center.first + size.first / 2 + 1),
-      m_top(center.second - size.second / 2 - 1),
-      m_bottom(center.second + size.second / 2 + 1),
+    : left_(center.first - size.first / 2 - 1),
+      right_(center.first + size.first / 2 + 1),
+      top_(center.second - size.second / 2 - 1),
+      bottom_(center.second + size.second / 2 + 1),
       m_too_big(false) {
   }
 
   Figure(int left, int right, int top, int bottom)
-    : m_left(left),
-      m_right(right),
-      m_top(top),
-      m_bottom(bottom) {
+    : left_(left),
+      right_(right),
+      top_(top),
+      bottom_(bottom) {
   }
 
   int width() const {
-    return m_right - m_left;
+    assert(!is_empty() && left_ <= right_);
+    return right_ - left_ + 1;
   }
 
   int height() const {
-    return m_bottom - m_top;
+    assert(!is_empty() && bottom_ >= top_);
+    return bottom_ - top_ + 1;
   }
 
   bool is_empty() const {
-    return m_left == -1 && m_right == -1 && m_top == -1 && m_bottom == -1;
+    return left_ == -1 && right_ == -1 && top_ == -1 && bottom_ == -1;
   }
 
   void add_point(const std::pair<int, int>& val) {
@@ -44,36 +46,40 @@ public:
       return;
     }
 
-    if (m_left == - 1 || m_left > val.second) {
-      m_left = val.second;
+    if (left_ == - 1 || left_ > val.second) {
+      left_ = val.second;
     }
 
-    if (m_top == - 1 || m_top > val.first) {
-      m_top = val.first;
+    if (top_ == - 1 || top_ > val.first) {
+      top_ = val.first;
     }
 
-    if (m_right == - 1 || m_right < val.second) {
-      m_right = val.second;
+    if (right_ == - 1 || right_ < val.second) {
+      right_ = val.second;
     }
 		
-    if (m_bottom == - 1 || m_bottom < val.first) {
-      m_bottom = val.first;
+    if (bottom_ == - 1 || bottom_ < val.first) {
+      bottom_ = val.first;
     }
 
-    if (m_right - m_left > 50) {
+    if (right_ - left_ > 50) {
       m_too_big = true;
     }
   }
 
   cv::Point2i CenterCV() const {
-    const int hor = m_left + (m_right - m_left) / 2;
-    const int ver = m_top + (m_bottom - m_top) / 2;
+    const int hor = left_ + (right_ - left_) / 2;
+    const int ver = top_ + (bottom_ - top_) / 2;
     return cv::Point2i(hor, ver);
   }
 
+  cv::Rect2i RectCV() const {
+    return cv::Rect2i(cv::Point2i(left_, top_), cv::Point2i(right_ + 1, bottom_ + 1));
+  }
+
   std::pair<int, int> center() const {
-    const int hor = m_left + (m_right - m_left) / 2;
-    const int ver = m_top + (m_bottom - m_top) / 2;
+    const int hor = left_ + (right_ - left_) / 2;
+    const int ver = top_ + (bottom_ - top_) / 2;
     return std::make_pair(hor, ver);
   }
 
@@ -82,19 +88,19 @@ public:
   }
 
   int left() const {
-    return m_left;
+    return left_;
   }
 
   int top() const {
-    return m_top;
+    return top_;
   }
 
   int right() const {
-    return m_right;
+    return right_;
   }
 
   int bottom() const {
-    return m_bottom;
+    return bottom_;
   }
 
   std::pair<int, int> bottom_right() const {
@@ -110,25 +116,25 @@ public:
   }
 
   bool operator<(const Figure& other) const {
-    if (m_left != other.m_left)           return m_left < other.m_left;
-    else if (m_top != other.m_top)        return m_top < other.m_top;
-    else if (m_right != other.m_right)    return m_right < other.m_right;
-    else if (m_bottom != other.m_bottom)  return m_bottom < other.m_bottom;
+    if (left_ != other.left_)             return left_ < other.left_;
+    else if (top_ != other.top_)        return top_ < other.top_;
+    else if (right_ != other.right_)      return right_ < other.right_;
+    else if (bottom_ != other.bottom_)  return bottom_ < other.bottom_;
     else                                  return false;
   }
 
   bool operator==(const Figure& other) const {
-    return m_left == other.m_left
-      && m_right == other.m_right
-      && m_top == other.m_top
-      && m_bottom == other.m_bottom;
+    return left_ == other.left_
+      && right_ == other.right_
+      && top_ == other.top_
+      && bottom_ == other.bottom_;
   }
 
 private:
-  int m_left;
-  int m_right;
-  int m_top;
-  int m_bottom;
+  int left_;
+  int right_;
+  int top_;
+  int bottom_;
   bool m_too_big;
 };
 

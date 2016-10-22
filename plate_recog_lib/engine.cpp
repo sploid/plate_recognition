@@ -1,11 +1,12 @@
 #include "engine.h"
+#include <algorithm>
+#include <array>
 #include <assert.h>
 #include <functional>
 #include <stdexcept>
+#include <numeric>
 
 #include <opencv2/opencv.hpp>
-#include <baseapi.h>
-//#include <leptonica/allheaders.h>
 
 #include "sym_recog.h"
 #include "utils.h"
@@ -94,6 +95,8 @@ void set_free_index( int index )
 #endif // _WIN32
 
 const int kMinGroupSize = 4;
+const int kMaxDistByX = 8;
+const int kMaxDistByY = 2;
 
 FoundNumber read_number_loop( const cv::Mat& input, const std::vector< int >& search_levels );
 
@@ -160,28 +163,22 @@ std::vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_h
 }
 
 // надо сделать какую-то пропорцию для зависимости угла от расстояния
-bool angle_is_equal( int an1, int an2 )
-{
-	const int angle_diff = 16;
-	int an_max = an1 + angle_diff;
-	int an_min = an1 - angle_diff;
-	if ( an_min >= 0 && an_max <= 360 )
-	{
-		const bool ret = an2 < an_max && an2 > an_min;
-		return ret;
-	}
-	else if ( an_min <= 0 )
-	{
-		an_min = an_min + 360;
-		return an2 < an_max || an2 > an_min;
-	}
-	else if ( an_max > 360 )
-	{
-		an_max = an_max - 360;
-		return an2 < an_max || an2 > an_min;
-	}
-	assert( false );
-	return false;
+bool AngleIsEqual(int an1, int an2) {
+  const int kAngleDiff = 16;
+  int an_max = an1 + kAngleDiff;
+  int an_min = an1 - kAngleDiff;
+  if (an_min >= 0 && an_max <= 360) {
+    const bool ret = an2 < an_max && an2 > an_min;
+    return ret;
+  } else if (an_min <= 0) {
+    an_min = an_min + 360;
+    return an2 < an_max || an2 > an_min;
+  } else if (an_max > 360) {
+    an_max = an_max - 360;
+    return an2 < an_max || an2 > an_min;
+  }
+  assert(false);
+  return false;
 }
 
 std::pair< char, double > find_sym_nn( bool num, const Figure& fig, const cv::Mat& original, number_data& stat_data )
@@ -365,34 +362,9 @@ void RemoveToSmallGroups(std::vector<FigureGroup>& groups) {
   }
 }
 
-// выкидываем элементы, что выходят за размеры номера, предпологаем что номер не выше 3 * высота первого элемента
-void figs_remote_too_long_by_y_from_first( std::vector< FigureGroup > & groups )
-{
-	for ( size_t nn = 0; nn < groups.size(); ++nn )
-	{
-		if ( groups[ nn ].size() > 2 )
-		{
-			const Figure& first_fig = groups[ nn ].at( 0 );
-			const double height_first = first_fig.height();
-			assert( first_fig.height() > 0. );
-			for ( int mm = groups[ nn ].size() - 1; mm >= 1; --mm )
-			{
-				const Figure& cur_fig = groups[ nn ][ mm ];
-				if ( abs( double( cur_fig.top() - first_fig.top() ) / 3. ) > height_first )
-				{
-					groups[ nn ].erase( groups[ nn ].begin() + mm );
-				}
-			}
-		}
-	}
-	// выкидываем группы, где меньше 3-х элементов
-        RemoveToSmallGroups(groups);
-}
-
 // выкидываем элементы, что выходят за размеры номера относительно первого элемента
 void RemoteTooFarFromFirst(std::vector<FigureGroup>& groups, int max_dist_coef_to_hei, std::function<int(const Figure&)> get_pos) {
-  for (size_t nn = 0; nn < groups.size(); ++nn) {
-    std::vector<FigureGroup>::iterator cur_group_iter = groups.begin() + nn;
+  for (auto cur_group_iter = begin(groups); cur_group_iter != end(groups); ++cur_group_iter) {
     assert(cur_group_iter->size() >= 3);
     const Figure& first_fig = cur_group_iter->at(0);
     const int max_dist = first_fig.height() * max_dist_coef_to_hei;
@@ -412,15 +384,16 @@ void RemoteTooFarFromFirst(std::vector<FigureGroup>& groups, int max_dist_coef_t
   RemoveToSmallGroups(groups);
 }
 
-void RemoveNotFitToFirstByHeight( std::vector< FigureGroup > & groups ) {
-  for (size_t nn = 0; nn < groups.size(); ++nn) {
-    std::vector<FigureGroup>::iterator cur_group_iter = groups.begin() + nn;
-    const Figure& first_fig = cur_group_iter->at(0);
-    const double height_first = static_cast<double>(first_fig.bottom() - first_fig.top());
+bool IsFitByHeight(const Figure& one, const Figure& two) {
+  const double height_one = static_cast<double>(one.height());
+  const double height_two = static_cast<double>(two.height());
+  return height_two * 0.8 < height_one  && height_one < height_two * 1.2;
+}
+
+void RemoveNotFitToFirstByHeight(std::vector<FigureGroup>& groups) {
+  for (auto cur_group_iter = begin(groups); cur_group_iter != end(groups); ++cur_group_iter) {
     for (int mm = cur_group_iter->size() - 1; mm >= 1; --mm) {
-      const Figure& cur_fig = cur_group_iter->at(mm);
-      const double height_cur = cur_fig.bottom() - cur_fig.top();
-      if (height_cur > height_first * 1.2 || height_cur < height_first * 0.8) {
+      if (!IsFitByHeight(cur_group_iter->at(mm), cur_group_iter->at(0))) {
         cur_group_iter->erase(cur_group_iter->begin() + mm);
       }
     }
@@ -429,47 +402,67 @@ void RemoveNotFitToFirstByHeight( std::vector< FigureGroup > & groups ) {
   RemoveToSmallGroups(groups);
 }
 
+// проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
+bool IsFigFitToGroupAngle(const Figure& fig, const FigureGroup& group, int group_angle) {
+  for (size_t yy = 1; yy < group.size(); ++yy) {
+    const Figure& next_fig = group.at(yy);
+    double angle_to_fig = 0.;
+    if (fig.left() > next_fig.left()) {
+      angle_to_fig = 57.2957795 * atan2(static_cast<double>(fig.left() - next_fig.left()), static_cast<double>(fig.bottom() - next_fig.bottom()));
+    } else {
+      angle_to_fig = 57.2957795 * atan2(static_cast<double>(next_fig.left() - fig.left()), static_cast<double>(next_fig.bottom() - fig.bottom()));
+    }
+    if (!AngleIsEqual(static_cast<int>(group_angle), static_cast<int>(angle_to_fig))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+double CalculateAngle(const Figure& fig_left, const Figure& fig_right) {
+  return 57.2957795 * atan2(static_cast<double>(fig_left.left() - fig_right.left()), static_cast<double>(fig_left.bottom() - fig_right.bottom()));
+}
+
+// подсчитываем средний угол в группе
+double CalculateAngle(const FigureGroup& group) {
+  assert(kMinGroupSize <= group.size());
+  double result = 0.;
+  size_t count = 0;
+  for (size_t nn = 0; nn < group.size() - 1; ++nn) {
+    for (size_t mm = nn + 1; mm < group.size(); ++mm) {
+      result += CalculateAngle(group[mm], group[nn]);
+      ++count;
+    }
+  }
+  return result / count;
+}
+
 // по отдельным фигурам создаем группы фигур
 std::vector<FigureGroup> MakeGroupsByAngle(std::vector<Figure>& figs) {
   std::vector<FigureGroup> result;
 
-  // формируем группы по углу
+  // формируем группы по углу для фигуры nn
   for (size_t nn = 0; nn < figs.size(); ++nn) {
     std::vector<std::pair<double, FigureGroup>> cur_fig_groups;
     // todo: тут возможно стоит идти только от nn + 1, т.к. фигуры отсортированы и идем только вправо
     for (size_t mm = 0; mm < figs.size(); ++mm) {
       if (mm != nn) {
-        if (figs[mm].left() > figs[nn].left()) {
+        const Figure& fig_to_add = figs[mm];
+        if (fig_to_add.left() > figs[nn].left()) {
 	  // угол между левыми-нижними углами фигуры
-	  const double angle = 57.2957795 * atan2(static_cast<double>(figs[mm].left() - figs[nn].left()), static_cast<double>(figs[mm].bottom() - figs[nn].bottom()));
-	  bool found = false;
-          for (size_t kk = 0; kk < cur_fig_groups.size(); ++kk) {
-            // проверяем что попадает в группу
-            if (angle_is_equal(static_cast<int>(cur_fig_groups[kk].first), static_cast<int>(angle))) {
-              bool ok = true;
-              // проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
-              for (size_t yy = 1; yy < cur_fig_groups[kk].second.size(); ++yy) {
-                const Figure& next_fig = cur_fig_groups[kk].second.at(yy);
-		const double angle_to_fig = 57.2957795 * atan2(static_cast<double>(figs[mm].left() - next_fig.left()), static_cast<double>(figs[mm].bottom() - next_fig.bottom()));
-                if (!angle_is_equal(static_cast<int>(cur_fig_groups[kk].first), static_cast<int>(angle_to_fig))) {
-                  ok = false;
-                  break;
-                }
-              }
-              if (ok) {
-                cur_fig_groups[kk].second.push_back(figs[mm]);
-                found = true;
-                break;
-              }
-            }
-          }
+	  const double angle = CalculateAngle(fig_to_add, figs[nn]);
+          std::vector<std::pair<double, FigureGroup>>::iterator cur_gr_iter = std::find_if(begin(cur_fig_groups), end(cur_fig_groups), [angle, fig_to_add](const std::pair<double, FigureGroup>& next_val) -> bool {
+            return AngleIsEqual(static_cast<int>(next_val.first), static_cast<int>(angle))
+                && IsFigFitToGroupAngle(fig_to_add, next_val.second, static_cast<int>(next_val.first));
+          });
 
-          // создаем группу
-          if ( !found ) {
-            FigureGroup to_add;
-            to_add.push_back( figs[ nn ] );
-            to_add.push_back( figs[ mm ] );
-            cur_fig_groups.push_back( std::make_pair( angle, to_add ) );
+          if (cur_gr_iter != end(cur_fig_groups)) {
+            cur_gr_iter->second.push_back(fig_to_add);
+          } else {
+            FigureGroup group_to_add;
+            group_to_add.push_back(figs[nn]);
+            group_to_add.push_back(fig_to_add);
+            cur_fig_groups.push_back(std::make_pair(angle, group_to_add));
           }
         }
       }
@@ -599,34 +592,7 @@ std::vector< found_symbol > figs_search_syms( const std::vector< pair_int >& pis
 
 // @todo (sploid): refactor for support output with several symbols
 std::pair<char, int> RecognizeSymbol(const cv::Mat& img) {
-  static tesseract::TessBaseAPI* api = nullptr;
-  if (!api) {
-    api = new tesseract::TessBaseAPI();
-    const int init_res = api->Init("C:\\soft\\alpr\\tess-install\\tessdata", "eng");
-    api->SetVariable("tessedit_char_whitelist", "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
-    api->SetVariable("save_blob_choices", "T");
-    api->SetPageSegMode(tesseract::PSM_SINGLE_CHAR);
-  }
-  //  api->SetImage(etal.data, etal.size().width, etal.size().height, etal.channels(), etal.step1());
-
-  //    api->SetRectangle(next.left(), next.top(), next.width(), next.height());
-  api->SetImage(img.data, img.size().width, img.size().height, img.channels(), img.step1());
-  const int rec_result = api->Recognize(NULL);
-
-  tesseract::ResultIterator* ri = api->GetIterator();
-  tesseract::PageIteratorLevel level = tesseract::RIL_SYMBOL;
-  std::pair<char, int> res = std::make_pair(FoundNumber::kUnknownSym, 0);
-  if (ri) {
-    const char* symbol = ri->GetUTF8Text(level);
-    if (symbol) {
-      if (*symbol != ' ') {
-        const float conf = ri->Confidence(level);
-        res = std::make_pair(*symbol, static_cast<int>(conf * 10));
-      }
-      delete[] symbol;
-    }
-  }
-  return res;
+  return std::make_pair<char, int>('\0', 0);
 }
 
 FoundNumber RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, const cv::Mat& original, number_data& stat_data) {
@@ -733,7 +699,7 @@ FigureGroup ParseToFigures(cv::Mat& mat) {
           if (fig_to_create.width() < fig_to_create.height()) {
             if (fig_to_create.width() > 1) {
 //              if (fig_to_create.height() / fig_to_create.width() < 4) {
-                ret.push_back( fig_to_create );
+                ret.push_back(fig_to_create);
 ///	      }
 	    }
           }
@@ -752,7 +718,7 @@ FigureGroup ParseToFigures(cv::Mat& mat) {
 		}
 		recog_debug->out_image( colored_mat );
 	}*/
-  sort( ret.begin(), ret.end(), less_by_left_pos );
+  sort(ret.begin(), ret.end(), less_by_left_pos);
   return ret;
 }
 
@@ -1174,6 +1140,227 @@ void RemoveTooNarrowFigures(FigureGroup& figs) {
   }
 }
 
+ParseToFigsResult ParseToFigures(const cv::Mat& input, int level) {
+  ParseToFigsResult result;
+  result.level = level;
+  cv::Mat gray_image = create_gray_image(input);
+//  cv::Mat wolf_out = gray_image.clone();
+//  NiblackSauvolaWolfJolion(gray_image, wolf_out, WOLFJOLION, next_level, next_level, k);
+  cv::Mat wolf_out = gray_image > level;
+  ReplaceBlackWhite(wolf_out); // конвертим для сингапура
+  result.bin_image = wolf_out.clone();
+  result.figs = ParseToFigures<0>(wolf_out);
+  // выкидываем слишком узкие штуки
+  RemoveTooNarrowFigures(result.figs);
+  return result;
+}
+
+std::vector<ParseToFigsResult> ParseToFigures(const cv::Mat& input, const std::vector<int>& wins) {
+  std::vector<ParseToFigsResult> result;
+  for (int next_level : wins) {
+    const ParseToFigsResult next_res = ParseToFigures(input, next_level);
+    if (!next_res.figs.empty()) {
+      result.push_back(next_res);
+    }
+  }
+  return result;
+}
+
+std::vector<std::pair<float, float>> Singapore8SymsKoeffs() {
+  std::vector<std::pair<float, float>> result;
+  return result;
+}
+
+bool IsValid(std::array<int, 8> syms, const FigureGroup& figs, float avarage_width) {
+  // проверяем что бы между соседними символами нельзя было всунуть еще один символ
+  for (int nn = 0; nn < 8 - 1; ++nn) {
+    if (syms[nn] != -1 && syms[nn + 1] != -1) {
+      const double dist = cv::norm(figs[syms[nn]].CenterCV() - figs[syms[nn + 1]].CenterCV());
+      if (dist > 1.5 * avarage_width) {
+        return false;
+      }
+    }
+  }
+  // проверяем что бы между символами с пропусками можно было всунуть сколько нужно
+  for (int nn = 0; nn < 8 - 1; ++nn) {
+    if (syms[nn] != -1 && syms[nn + 1] == -1) {
+      std::array<int, 8>::iterator next_valid_iter = find_if_not(begin(syms) + nn + 1, end(syms), bind2nd(std::equal_to<int>(), -1));
+      if (next_valid_iter != end(syms)) {
+        const double dist = cv::norm(figs[syms[nn]].CenterCV() - figs[*next_valid_iter].CenterCV());
+        if (dist < avarage_width * (*next_valid_iter - syms[nn] + 1)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool MoveNext(std::array<int, 8>& syms) {
+  int to_move = -1;
+  reverse(begin(syms), end(syms));
+  {
+    std::array<int, 8>::iterator first_invalid_iter = find_if(begin(syms), end(syms), bind2nd(std::equal_to<int>(), -1));
+    if (first_invalid_iter == end(syms)) {
+      reverse(begin(syms), end(syms));
+      return false;
+    }
+    const size_t first_invalid_index = distance(begin(syms), first_invalid_iter);
+    std::array<int, 8>::iterator first_valid_iter = find_if_not(first_invalid_iter, end(syms), bind2nd(std::equal_to<int>(), -1));
+    if (first_valid_iter == end(syms)) {
+      reverse(begin(syms), end(syms));
+      return false;
+    }
+    const size_t first_valid_index = distance(begin(syms), first_valid_iter);
+    syms[first_valid_index - 1] = syms[first_valid_index];
+    syms[first_valid_index] = -1;
+    to_move = 8 - (static_cast<int>(first_valid_index) - 1);
+  }
+  reverse(begin(syms), end(syms));
+  // подтягиваем вверх что уже было сдвинуто
+  while (to_move < 8 && to_move > 0) {
+    if (syms[to_move] == -1) {
+      std::array<int, 8>::iterator first_valid_iter = find_if_not(begin(syms) + to_move, end(syms), bind2nd(std::equal_to<int>(), -1));
+      if (first_valid_iter == syms.end()) {
+        break;
+      } else {
+        syms[to_move] = *first_valid_iter;
+        *first_valid_iter = -1;
+      }
+    }
+    ++to_move;
+  } 
+  return true;
+}
+
+std::vector<std::array<int, 8>> CollectCorredVariants(const FigureGroup& group) {
+  const float avarage_height = static_cast<float>(accumulate(begin(group), end(group), 0, [] (int prev, const Figure& other) -> int { return other.height() + prev; })) / static_cast<float>(group.size());
+  const float avarage_width = static_cast<float>(accumulate(begin(group), end(group), 0, [] (int prev, const Figure& other) -> int { return other.width() + prev; })) / static_cast<float>(group.size());
+  std::vector<std::array<int, 8>> result;
+  bool do_next = true;
+  std::array<int, 8> next_order;
+  for (size_t nn = 0; nn < std::max(group.size(), static_cast<size_t>(8)); ++nn) {
+    next_order[nn] = (nn < group.size() ? static_cast<int>(nn) : -1);
+  }
+  while (do_next) {
+    if (IsValid(next_order, group, avarage_width)) {
+      result.push_back(next_order);
+    }
+    do_next = MoveNext(next_order);
+  }
+
+  return result;
+}
+
+bool IsIntersect(const Figure& fig, const FigureGroup& group) {
+  for (const Figure& next_fig: group) {
+    const cv::Rect2i& next_rc = next_fig.RectCV();
+    const cv::Rect2i& fig_rc = fig.RectCV();
+    if ((next_rc & fig_rc).area() > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool IsNotTooFarFromGroup(const Figure& fig, const FigureGroup& group) {
+  const double average_height = static_cast<double>(accumulate(begin(group), end(group), 0, [](int prev, const Figure& fig) -> int { return prev + fig.height(); })) / static_cast<double>(group.size());
+  const int max_diff_x = static_cast<int>(average_height * static_cast<double>(kMaxDistByX));
+  const int max_diff_y = static_cast<int>(average_height * static_cast<double>(kMaxDistByY));
+
+  for (auto gr_iter = begin(group); gr_iter != end(group); ++gr_iter) {
+    if (std::abs(gr_iter->CenterCV().x - fig.CenterCV().x) >= max_diff_x) {
+      return false;
+    }
+    if (std::abs(gr_iter->CenterCV().y - fig.CenterCV().y) >= max_diff_y) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::vector<FigureGroup> ProcessFoundGroups(int curr_level, const std::vector<FigureGroup>& input_groups, const std::vector<ParseToFigsResult>& other_figs) {
+  std::vector<int> levels = {curr_level + 10, curr_level - 10, curr_level + 20, curr_level - 20};
+  std::remove_if(begin(levels), end(levels), [](int to_check) -> bool { return to_check <= 0 || to_check >= 255; });
+  std::vector<FigureGroup> result;
+  for (const FigureGroup& next_group : input_groups) {
+    FigureGroup composed_group = next_group;
+    for (const int lev_to_check : levels) {
+      std::vector<ParseToFigsResult>::const_iterator it_fig_level = std::find_if(begin(other_figs), end(other_figs), [lev_to_check](const ParseToFigsResult& in)->bool { return in.level == lev_to_check; });
+      if (it_fig_level != end(other_figs)) {
+        for (const Figure& fig: it_fig_level->figs) {
+          // check intercect
+          if (!IsIntersect(fig, composed_group)) {
+            // check angle
+            if (IsFigFitToGroupAngle(fig, next_group, CalculateAngle(next_group))) {
+              // check size
+              if (IsFitByHeight(fig, next_group.at(0))) {
+                // check distance
+                if (IsNotTooFarFromGroup(fig, next_group)) {
+                  // search pos and insert
+                  auto pos_iter = find_if(begin(composed_group), end(composed_group), [fig](const Figure& check_fig) -> bool { return fig.left() < check_fig.left(); });
+                  composed_group.insert(pos_iter, fig);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    result.push_back(composed_group);
+
+/*    std::vector<std::array<int, 8>> all_groups = CollectCorredVariants(next_group);
+    // пытаемся найти фигуры после
+    for (std::array<int, 8> next_array_candidate : all_groups) {
+    }
+
+    std::stringstream ss;
+    for (size_t nn = 0; nn < all_syms.size(); ++nn) {
+      for (int mm = 0; mm < 8; ++mm) {
+        ss << all_syms[nn][mm];
+      }
+      ss << std::endl;
+    }*/
+  }
+
+  return result;
+}
+
+std::vector<FigureGroup> MakeGroups(const FigureGroup& figs) {
+  FigureGroup figs_clone(figs);
+  std::vector<FigureGroup> groups = MakeGroupsByAngle(figs_clone);
+
+  /*  for (int nn = 0; nn < groups.size(); ++nn) {
+  cv::Mat ccc = result.first.clone();
+  cv::Mat kkk;
+  cvtColor(ccc, kkk, CV_GRAY2RGB);
+  std::vector<FigureGroup> cur;
+  cur.push_back(groups.at(nn));
+  DrawGroupsFigures(kkk, cur, CV_RGB(255, 0, 0));
+  }*/
+  // удаляем лишнее по ширине
+  RemoteTooFarFromFirst(groups, kMaxDistByX, std::bind(&Figure::left, std::placeholders::_1));
+  // удаляем лишнее по длине
+  RemoteTooFarFromFirst(groups, kMaxDistByY, std::bind(&Figure::bottom, std::placeholders::_1));
+  // выкидываем элементы, не пропорциональные первому элементу
+  RemoveNotFitToFirstByHeight(groups);
+  // выкидываем группы, которые включаются в другие группы
+  RemoveIncludedGroups(groups);
+  // сливаем пересекающиеся группы
+  MergeIntersectsGroups(groups);
+
+  return groups;
+}
+
+std::pair<cv::Mat, std::vector<FigureGroup>> ParseToGroups(const cv::Mat& input, int level) {
+  std::pair<cv::Mat, std::vector<FigureGroup>> result;
+  const ParseToFigsResult par_fig_res = ParseToFigures(input, level);
+  result.first = par_fig_res.bin_image;
+  result.second = MakeGroups(par_fig_res.figs);
+
+  return result;
+}
+
 template<int stat_data_index>
 std::vector<FoundNumber> ReadNumberImpl(const cv::Mat& input, int gray_level, number_data& stat_data) {
   const cv::Mat& gray_image = create_gray_image(input);
@@ -1284,7 +1471,8 @@ FoundNumber read_number_loop(const cv::Mat& input, const std::vector<int>& searc
 		}*/
   } catch ( const cv::Exception& e) {
     const char* tt = e.what();
-    int t = 0;
+    (void)tt;
+    assert(false);
   }
   set_free_index(free_index);
   const int best_index = fine_best_index(all_nums);
@@ -1307,4 +1495,35 @@ FoundNumber read_number_loop(const cv::Mat& input, const std::vector<int>& searc
   } else {
     return all_nums.at(best_index);
   }
+}
+
+std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const cv::Mat& input) {
+  std::vector<ParseToGroupWithProcessingResult> result;
+
+  const int kStepSize = 10;
+
+  // находим все фигуры
+  std::vector<ParseToFigsResult> all_figs;
+  int nn = 150;
+//  for (int nn = 0; nn < 255; nn += kStepSize) {
+    all_figs.push_back(ParseToFigures(input, nn));
+//  }
+
+//  for (int nn = 0; nn < 255; nn += kStepSize) {
+    auto cur_lev_figs = std::find_if(begin(all_figs), end(all_figs), [nn](const ParseToFigsResult& other) -> bool { return other.level == nn; });
+    assert(cur_lev_figs != end(all_figs));
+    const std::vector<FigureGroup> parsed_groups = MakeGroups(cur_lev_figs->figs);
+    const std::vector<FigureGroup> process_groups = ProcessFoundGroups(nn, parsed_groups, all_figs);
+    for (size_t mm = 0; mm < process_groups.size(); ++mm) {
+      ParseToGroupWithProcessingResult next;
+      next.img = cur_lev_figs->bin_image.clone();
+      next.level = nn;
+      next.group = process_groups.at(mm);
+      if (next.group.size()) {
+        result.push_back(next);
+      }
+    }
+//  }
+
+  return result;
 }

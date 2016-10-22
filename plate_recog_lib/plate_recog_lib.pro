@@ -4,7 +4,7 @@ CONFIG(debug, debug|release) {
 	DESTDIR = $$_PRO_FILE_PWD_/../bin/release
 }
 
-DEFINES += PLATE_RECOG_LIB
+DEFINES += PLATE_RECOG_LIB NOMINMAX
 QT -= gui core
 TEMPLATE = lib
 CONFIG += static
@@ -20,5 +20,3 @@ SOURCES = \
 		sym_recog.cpp
 
 include(../opencv.pri)
-
-INCLUDEPATH += C:/soft/alpr/tesseract/api C:/soft/alpr/tesseract/ccmain C:/soft/alpr/tesseract/ccutil C:/soft/alpr/tesseract/ccstruct
