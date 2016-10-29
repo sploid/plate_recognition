@@ -63,7 +63,7 @@ struct ParseToFigsResult {
 ParseToFigsResult ParseToFigures(const cv::Mat& input, int level);
 std::vector<ParseToFigsResult> ParseToFigures(const cv::Mat& input, const std::vector<int>& levels);
 std::pair<cv::Mat, std::vector<FigureGroup>> ParseToGroups(const cv::Mat& input, int level);
-std::vector<FigureGroup> ProcessFoundGroups(int curr_level, const std::vector<FigureGroup>& input_groups, const std::vector<ParseToFigsResult>& other_figs);
+std::vector<FigureGroup> ProcessFoundGroups(int curr_level, cv::Mat& input_mat, const std::vector<FigureGroup>& input_groups, const std::vector<ParseToFigsResult>& other_figs);
 
 struct ParseToGroupWithProcessingResult {
   cv::Mat img;

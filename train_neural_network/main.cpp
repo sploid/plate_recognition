@@ -1,275 +1,154 @@
+#include <cstdio>
+#include <vector>
+#include <iostream>
+
 #include <fstream>
 #include <opencv2/opencv.hpp>
 
 #ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4127 4512 )
+#pragma warning(push)
+#pragma warning(disable : 4127 4512)
 #endif
-#include <QDir>
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
+
 #include <QCoreApplication>
+#include <QDir>
+#include <QDebug>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include "sym_recog.h"
 
-using namespace std;
-using namespace cv;
-
-const int max_hidden_neuron = 40;
-const int min_hidden_neuron = 20;
-
-vector< pair< char, Mat > > train_data( bool num )
-{
-	vector< pair< char, Mat > > ret;
-	QDir image_dir( QCoreApplication::applicationDirPath() + "/../../train_data" );
-	if ( image_dir.exists() )
-	{
-		QStringList dir_filter;
-		if ( num )
-		{
-			dir_filter << "0" << "1" << "2" << "3" << "4" << "5" << "6" << "7" << "8" << "9";
-		}
-		else
-		{
-			dir_filter << "A" << "B" << "C" << "E" << "H" << "K" << "M" << "O" << "P" << "T" << "X" << "Y";
-		}
-		for ( QStringList::const_iterator it = dir_filter.constBegin(); it != dir_filter.constEnd(); ++it )
-		{
-			if ( image_dir.cd( *it ) )
-			{
-				const QStringList all_files = image_dir.entryList( QStringList() << "*.png" );
-				for ( int nn = 0; nn < all_files.size(); ++nn )
-				{
-					const QString& next_file_name = all_files.at( nn );
-					const Mat one_chan_gray = from_file_to_row( ( image_dir.absolutePath() + "//" + next_file_name ).toLocal8Bit().data() );
-					if ( !one_chan_gray.empty() )
-					{
-						ret.push_back( make_pair( it->toLocal8Bit()[0], one_chan_gray ) );
-					}
-					else
-					{
-						cout << "invalid image format: " << next_file_name.toLocal8Bit().data();
-					}
-				}
-
-				image_dir.cdUp();
-			}
-		}
-	}
-	return ret;
+int ParseToInputOutputData(const std::vector<std::pair<char, cv::Mat>>& t_data, cv::Mat& input, cv::Mat& output, int els_in_row) {
+  std::set<char> vals; // all chars
+  for (auto& next : t_data) {
+    vals.insert(next.first);
+  }
+  int index = 0;
+  for (const char& next : vals) {
+    qDebug() << "next: " << next << index;
+    ++index;
+  }
+  int count_ret = static_cast<int>(vals.size());
+  input = cv::Mat(0, els_in_row, CV_32F);
+  output = cv::Mat(static_cast<int>(t_data.size()), count_ret, CV_32F);
+  for (size_t nn = 0; nn < t_data.size(); ++nn) {
+    input.push_back(t_data.at(nn).second);
+    for (int mm = 0; mm < count_ret; ++mm) {
+      output.at<float>(static_cast<int>(nn), mm) = 0.;
+    }
+    const auto cur_iter = find(begin(vals), end(vals), t_data.at(nn).first);
+    assert(cur_iter != end(vals));
+    const int sym_index = static_cast<int>(std::distance(begin(vals), cur_iter));
+    output.at<float>(static_cast<int>(nn), sym_index) = 1.;
+  }
+  return static_cast<int>(vals.size());
 }
 
-pair< string, string > path_to_save_train( bool num )
-{
-	const string core_part = num ? "num" : "char";
-	const string root_folder( QDir::toNativeSeparators( QCoreApplication::applicationDirPath() + "/../.." ).toLocal8Bit() );
-	return make_pair( root_folder + "/other/neural_net_" + core_part + ".yml", root_folder + "/plate_recog_lib/neural_net_" + core_part + ".cpp");
+float Evaluate(const cv::Mat& output, int output_row, const cv::Mat& pred_out) {
+  // проверяем правильный ли ответ
+  if (search_max_val(output, output_row) != search_max_val(pred_out))
+    return -100.;
+
+  // находим смещение
+  float ret = 0.;
+  for (int nn = 0; nn < output.cols; ++nn) {
+    float diff = output.at<float>(output_row, nn) - pred_out.at<float>(0, nn);
+    ret += std::abs(diff);
+  }
+  return ret;
 }
 
-void save_to_cpp( const string& source_file_name, const string& dest_file_name, const string& var_name )
-{
-	{
-		ifstream source_stream( source_file_name );
-		ofstream dest_stream( dest_file_name );
-		if ( !dest_stream.is_open() || !source_stream.is_open() )
-		{
-			cout << "!!! Failed open stream !!!" << endl;
-		}
+std::vector<std::pair<char, cv::Mat>> ReadTrainData() {
+  std::vector<std::pair<char, cv::Mat>> ret;
+  if (QCoreApplication::arguments().size() < 2) {
+    return ret;
+  }
+  QDir image_dir(QCoreApplication::arguments()[1]);
+  if (image_dir.exists()) {
+    const QStringList dir_filter = image_dir.entryList(QDir::Dirs| QDir::NoDotAndDotDot);
+    for (QStringList::const_iterator it = dir_filter.constBegin(); it != dir_filter.constEnd(); ++it) {
+      if (image_dir.cd(*it)) {
+        const QStringList all_files = image_dir.entryList(QStringList() << "*.png");
+        for (int nn = 0; nn < all_files.size(); ++nn) {
+          const QString& next_file_name = all_files.at(nn);
+          const cv::Mat one_chan_gray = from_file_to_row((image_dir.absolutePath() + "//" + next_file_name).toLocal8Bit().data());
+          if (!one_chan_gray.empty()) {
+            ret.push_back(std::make_pair(it->toLocal8Bit()[0], one_chan_gray));
+          } else {
+            Q_ASSERT(false);
+            std::cout << "invalid image format: " << next_file_name.toLocal8Bit().data();
+          }
+        }
 
-		dest_stream << endl << "const char " << var_name << "[] = {" << endl;
-		dest_stream.setf ( std::ios::hex, std::ios::basefield ); 
-		int curr_index = 0;
-		while ( source_stream.good() )
-		{
-			const char next_sym = static_cast< char >( source_stream.get() );
-			if ( source_stream.good() )
-			{
-				if ( curr_index != 0 )
-				{
-					dest_stream << ", ";
-				}
-				dest_stream << " 0x";
-				dest_stream.width( 2 );
-				dest_stream.fill( '0' );
-				dest_stream << static_cast< int >( next_sym );
-
-				++curr_index;
-				if ( curr_index % 100 == 0 )
-				{
-					dest_stream << endl;
-				}
-			}
-		}
-		dest_stream << endl << " };" << endl;
-	}
+        image_dir.cdUp();
+      }
+    }
+  }
+  return ret;
 }
 
-void parse_to_input_output_data( const vector< pair< char, Mat > >& t_data, Mat& input, Mat& output, int els_in_row, bool num )
-{
-	const int count_ret = num ? 10 : 12;
-	input = Mat( 0, els_in_row, CV_32F );
-	output = Mat( t_data.size(), count_ret, CV_32F );
-	for ( size_t nn = 0; nn < t_data.size(); ++nn )
-	{
-		input.push_back( t_data.at( nn ).second );
-		for ( int mm = 0; mm < count_ret; ++mm )
-		{
-			output.at< float >( nn, mm ) = 0.;
-		}
-		int el_index = 0;
-		if ( num )
-		{
-			el_index = t_data.at( nn ).first - 48;
-		}
-		else
-		{
-			switch (t_data.at( nn ).first)
-			{
-			default:
-				assert( !"there should be no such char" );
-			case 'A':
-				el_index = 0;
-				break;
-			case 'B':
-				el_index = 1;
-				break;
-			case 'C':
-				el_index = 2;
-				break;
-			case 'E':
-				el_index = 3;
-				break;
-			case 'H':
-				el_index = 4;
-				break;
-			case 'K':
-				el_index = 5;
-				break;
-			case 'M':
-				el_index = 6;
-				break;
-			case 'O':
-				el_index = 7;
-				break;
-			case 'P':
-				el_index = 8;
-				break;
-			case 'T':
-				el_index = 9;
-				break;
-			case 'X':
-				el_index = 10;
-				break;
-			case 'Y':
-				el_index = 11;
-				break;
-			}
-		}
-		output.at< float >( nn, el_index ) = 1.;
-	}
-}
+int MakeTraining() {
+  if (QCoreApplication::arguments().size() < 3) {
+    std::cout << "Invalid output file";
+    return -1;
+  }
 
-float evaluate( const Mat& output, int output_row, const Mat& pred_out )
-{
-	// проверяем правильный ли ответ
-	if ( search_max_val( output, output_row ) != search_max_val( pred_out ) )
-		return -100.;
+  const std::vector<std::pair<char, cv::Mat>> t_data = ReadTrainData();
+  if (t_data.empty()) {
+    std::cout << "Input files not found";
+    return -1;
+  }
 
-	// находим смещение
-	float ret = 0.;
-	for ( int nn = 0; nn < output.cols; ++nn )
-	{
-		ret += abs( output.at< float >( output_row, nn ) - pred_out.at< float >( 0, nn ) );
-	}
-	return ret;
-}
+  cv::Mat input, output;
+  const int count_types_syms = ParseToInputOutputData(t_data, input, output, kDataWidth * kDataHeight);
 
-void fill_hidden_layers( vector< Mat >& configs, Mat& layer_sizes, int layer_index, int count_hidden )
-{
-	for ( int nn = min_hidden_neuron; nn <= max_hidden_neuron; ++nn )
-	{
-		layer_sizes.at< int >( layer_index + 1 ) = nn;
-		if ( layer_index == count_hidden - 1 )
-		{
-			configs.push_back( layer_sizes.clone() );
-		}
-		else
-		{
-			fill_hidden_layers( configs, layer_sizes, layer_index + 1, count_hidden );
-		}
-	}
-}
+//  bool have_invalid = false;
+//  float diff_summ = 0.;
+  try {
+    cv::theRNG().state = 0x111111;
 
-void make_training( bool num )
-{
-	const int max_hidden_levels = 1;
-	const vector< pair< char, Mat > > t_data = train_data( num );
-	if ( t_data.empty() )
-	{
-		cout << "input files not found";
-		return;
-	}
-	Mat input, output;
-	parse_to_input_output_data( t_data, input, output, data_width * data_height, num );
-	Mat weights( 1, t_data.size(), CV_32FC1, Scalar::all( 1 ) );
+    int layer_sz[] = {kDataWidth * kDataHeight, 200, 200, count_types_syms};
+    const int nlayers = (int)(sizeof(layer_sz) / sizeof(layer_sz[0]));
+    const cv::Mat layer_sizes(1, nlayers, CV_32S, layer_sz);
 
-	// формируем конфигурации сети
-	vector< Mat > configs;
-	Mat first_size( 1, 2, CV_32SC1 );
-	first_size.at< int >( 0 ) = data_width * data_height;
-	first_size.at< int >( 1 ) = num ? 10 : 12; // 10 цифр, 12 букв
-	configs.push_back( first_size );
-	for ( int nn = 1; nn <= max_hidden_levels; ++nn )
-	{
-		const int all_levels_count = 2 + nn;
-		Mat l_size( 1, all_levels_count, CV_32SC1 );
-		l_size.at< int >( 0 ) = data_width * data_height;
-		l_size.at< int >( all_levels_count - 1 ) = num ? 10 : 12; // 10 цифр, 12 букв
+    cv::Ptr<cv::ml::ANN_MLP> mlp = cv::ml::ANN_MLP::create();
+    mlp->setLayerSizes(layer_sizes);
+    mlp->setActivationFunction(cv::ml::ANN_MLP::SIGMOID_SYM, 0., 0.);
+    mlp->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER + (0 > 0 ? cv::TermCriteria::EPS : 0), 300, 0));
+    mlp->setTrainMethod(cv::ml::ANN_MLP::BACKPROP, 0.001);
 
-		fill_hidden_layers( configs, l_size, 0, nn );
-	}
+    cv::Ptr<cv::ml::TrainData> train_data = cv::ml::TrainData::create(input, cv::ml::SampleTypes::ROW_SAMPLE, output);
+    const bool train_result = mlp->train(train_data);
+    if (!train_result) {
+      std::cout << "Failed train.";
+      return -1;
+    }
+    cv::Mat turu;
+    mlp->predict(input.row(0), turu);
+    {
+      cv::FileStorage fs(QCoreApplication::arguments().at(2).toLocal8Bit().data(), cv::FileStorage::WRITE);
+      mlp->write(fs);
+      fs.release();
+    }
 
-	assert( !configs.empty() );
-	int best_index = -1;
-	float best_diff = 100.;
-	for ( size_t cc = 0; cc < configs.size(); ++cc )
-	{
-		cout << configs.at( cc ) << endl;
-		bool have_invalid = false;
-		float diff_summ = 0.;
-		try
-		{
-			theRNG().state = 0x111111;
-			CvANN_MLP mlp( configs.at( cc ) );
-			mlp.train( input, output, weights );
-			for ( size_t ll = 0; ll < t_data.size(); ++ll )
-			{
-				Mat pred_out;
-				mlp.predict( input.row( ll ), pred_out );
-				const float diff = evaluate( output, ll, pred_out );
-				if ( diff >= -50. )
-				{
-					diff_summ += diff;
-				}
-				else
-				{
-					have_invalid = true;
-				}
-			}
-		}
-		catch (const exception& e)
-		{
-			(void)e;
-			have_invalid = true;
-		}
-		if ( !have_invalid && ( best_index == -1 || best_diff > diff_summ ) )
-		{
-			best_index = cc;
-			best_diff = diff_summ;
-		}
-	}
-	cout << configs.at( best_index ) << endl;
+/*      for (size_t ll = 0; ll < t_data.size(); ++ll) {
+        cv::Mat pred_out;
+        float yur = mlp->predict(input.row(ll), pred_out);
+        const float diff = Evaluate(output, ll, pred_out);
+        if (diff >= -50.) {
+          diff_summ += diff;
+        } else {
+          have_invalid = true;
+        }
+      }*/
+    return 0;
+  } catch (const std::exception& e) {
+    std::cout << e.what();
+    return -1;
+  }
+/*	cout << configs.at( best_index ) << endl;
 	// сохраняем наилучший результат в файл
 	theRNG().state = 0x111111;
 	CvANN_MLP mlp( configs.at( best_index ) );
@@ -280,12 +159,10 @@ void make_training( bool num )
 		mlp.write( *fs, "mlp" );
 		fs.release();
 	}
-	save_to_cpp( file_path.first, file_path.second, string( "neural_net_" ) + ( num ? "num" : "char" ) );
+	save_to_cpp( file_path.first, file_path.second, string( "neural_net_" ) + ( num ? "num" : "char" ) );*/
 }
 
-int main( int argc, char** argv )
-{
-	QCoreApplication a( argc, argv );
-	make_training( false );
-	make_training( true );
+int main( int argc, char** argv ) {
+  QCoreApplication a( argc, argv );
+  return MakeTraining();
 }

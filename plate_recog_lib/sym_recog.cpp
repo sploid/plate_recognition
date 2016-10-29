@@ -59,15 +59,15 @@ cv::Mat convert_to_row( const cv::Mat& input )
 		cv::Mat gray_float( one_chan_gray.size(), CV_32F );
 		one_chan_gray.convertTo( gray_float, CV_32F );
 
-		cv::Mat float_sized( data_height, data_width, CV_32F );
+		cv::Mat float_sized(kDataHeight, kDataWidth, CV_32F );
 		cv::resize( gray_float, float_sized, float_sized.size() );
 
-		cv::Mat ret( 1, data_height * data_width, CV_32F );
-		for ( int mm = 0; mm < data_height; ++mm )
+		cv::Mat ret( 1, kDataHeight * kDataWidth, CV_32F );
+		for ( int mm = 0; mm < kDataHeight; ++mm )
 		{
-			for ( int kk = 0; kk < data_width; ++kk )
+			for ( int kk = 0; kk < kDataWidth; ++kk )
 			{
-				const int cur_el = mm * data_width + kk;
+				const int cur_el = mm * kDataWidth + kk;
 				float val = float_sized.at< float >( mm, kk );
 				val = val / 255.F;
 				ret.at< float >( 0, cur_el ) = val;
