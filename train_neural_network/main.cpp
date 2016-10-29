@@ -1,8 +1,8 @@
 #include <cstdio>
-#include <vector>
-#include <iostream>
-
 #include <fstream>
+#include <iostream>
+#include <vector>
+
 #include <opencv2/opencv.hpp>
 
 #ifdef _MSC_VER
