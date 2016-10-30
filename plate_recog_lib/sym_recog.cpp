@@ -32,51 +32,42 @@ int search_max_val( const cv::Mat& data, int row )
 	return max_col;
 }
 
-cv::Mat convert_to_row( const cv::Mat& input )
-{
-	cv::Mat one_chan_gray;
-	if ( input.channels() == 3 && input.depth() == CV_MAT_DEPTH( CV_8U ) )
-	{
-		cv::Mat gray( input.size(), CV_8U );
-		cvtColor( input, one_chan_gray, CV_RGB2GRAY );
-	}
-	else if ( input.channels() == 1 && input.depth() == CV_MAT_DEPTH( CV_8U ) )
-	{
-//		one_chan_gray = input.clone();
-		one_chan_gray = input;
-	}
-	else
-	{
-		assert( !"Unsupported image format" );
-	}
+cv::Mat convert_to_row(const cv::Mat& input) {
+  cv::Mat one_chan_gray;
+  if (input.channels() == 3 && input.depth() == CV_MAT_DEPTH(CV_8U)) {
+    cv::Mat gray(input.size(), CV_8U);
+    cvtColor(input, one_chan_gray, CV_RGB2GRAY);
+  } else if (input.channels() == 1 && input.depth() == CV_MAT_DEPTH(CV_8U)) {
+//  one_chan_gray = input.clone();
+    one_chan_gray = input;
+  } else {
+    assert( !"Unsupported image format" );
+  }
 
-	if ( !one_chan_gray.empty() )
-	{
-		// сглаживаем
-		boxFilter( one_chan_gray, one_chan_gray, -1, cv::Size( 3, 3 ) );
-		// растягиваем по цвету
-		equalizeHist( one_chan_gray, one_chan_gray );
-		cv::Mat gray_float( one_chan_gray.size(), CV_32F );
-		one_chan_gray.convertTo( gray_float, CV_32F );
+  if (!one_chan_gray.empty()) {
+    // сглаживаем
+    boxFilter( one_chan_gray, one_chan_gray, -1, cv::Size(3, 3));
+    // растягиваем по цвету
+    equalizeHist(one_chan_gray, one_chan_gray);
+    cv::Mat gray_float(one_chan_gray.size(), CV_32F);
+    one_chan_gray.convertTo(gray_float, CV_32F);
 
-		cv::Mat float_sized(kDataHeight, kDataWidth, CV_32F );
-		cv::resize( gray_float, float_sized, float_sized.size() );
+    cv::Mat float_sized(kDataHeight, kDataWidth, CV_32F);
+    cv::resize(gray_float, float_sized, float_sized.size());
 
-		cv::Mat ret( 1, kDataHeight * kDataWidth, CV_32F );
-		for ( int mm = 0; mm < kDataHeight; ++mm )
-		{
-			for ( int kk = 0; kk < kDataWidth; ++kk )
-			{
-				const int cur_el = mm * kDataWidth + kk;
-				float val = float_sized.at< float >( mm, kk );
-				val = val / 255.F;
-				ret.at< float >( 0, cur_el ) = val;
-			}
-		}
+    cv::Mat ret(1, kDataHeight * kDataWidth, CV_32F);
+    for (int mm = 0; mm < kDataHeight; ++mm) {
+      for (int kk = 0; kk < kDataWidth; ++kk) {
+        const int cur_el = mm * kDataWidth + kk;
+        float val = float_sized.at<float>(mm, kk);
+        val = val / 255.F;
+        ret.at<float>(0, cur_el) = val;
+      }
+    }
 
-		return ret;
-	}
-	return cv::Mat();
+    return ret;
+  }
+  return cv::Mat();
 }
 
 cv::Mat from_file_to_row( const std::string& file_name )

@@ -69,6 +69,8 @@ struct ParseToGroupWithProcessingResult {
   cv::Mat img;
   int level;
   FigureGroup group;
+  std::string number;
+  std::vector<int> weights;
 };
 
 std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const cv::Mat& input);

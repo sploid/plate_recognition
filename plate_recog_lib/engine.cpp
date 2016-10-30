@@ -3,15 +3,15 @@
 #include <array>
 #include <assert.h>
 #include <functional>
-#include <stdexcept>
+#include <memory>
 #include <numeric>
+#include <stdexcept>
 
 #include <opencv2/opencv.hpp>
 
 #include "sym_recog.h"
 #include "utils.h"
 #include "figure.h"
-#include "binarizewolfjolion.h"
 
 struct number_data
 {
@@ -363,7 +363,7 @@ void RemoteTooFarFromFirst(std::vector<FigureGroup>& groups, int max_dist_coef_t
     const Figure& first_fig = cur_group_iter->at(0);
     const int max_dist = first_fig.height() * max_dist_coef_to_hei;
     assert(first_fig.height() > 0.);
-    for (int mm = cur_group_iter->size() - 1; mm >= 1; --mm) {
+    for (int mm = static_cast<int>(cur_group_iter->size()) - 1; mm >= 1; --mm) {
       const Figure& cur_fig = cur_group_iter->at(mm);
       if (get_pos(cur_fig) - get_pos(first_fig) > max_dist) {
         // @todo: тут можно оптимизировать и в начале найти самую допустимо-дальнюю, а уже затем чистить список
@@ -386,7 +386,7 @@ bool IsFitByHeight(const Figure& one, const Figure& two) {
 
 void RemoveNotFitToFirstByHeight(std::vector<FigureGroup>& groups) {
   for (auto cur_group_iter = begin(groups); cur_group_iter != end(groups); ++cur_group_iter) {
-    for (int mm = cur_group_iter->size() - 1; mm >= 1; --mm) {
+    for (int mm = static_cast<int>(cur_group_iter->size()) - 1; mm >= 1; --mm) {
       if (!IsFitByHeight(cur_group_iter->at(mm), cur_group_iter->at(0))) {
         cur_group_iter->erase(cur_group_iter->begin() + mm);
       }
@@ -586,13 +586,68 @@ std::vector< found_symbol > figs_search_syms( const std::vector< pair_int >& pis
 
 // @todo (sploid): refactor for support output with several symbols
 std::pair<char, int> RecognizeSymbol(const cv::Mat& img) {
-  return std::make_pair<char, int>('\0', 0);
+  static cv::Ptr<cv::ml::ANN_MLP> mlp;
+  if (!mlp) {
+    mlp = cv::ml::ANN_MLP::create();
+    cv::FileStorage fs("C:\\cache\\sing\\all_syms_train.xml", cv::FileStorage::READ | cv::FileStorage::FORMAT_XML);
+    mlp->read(fs.root());
+  }
+
+  cv::Mat to_pred = convert_to_row(img);
+  cv::Mat to_out;
+  const int pred_result = static_cast<int>(mlp->predict(to_pred, to_out));
+  switch (pred_result) {
+    case 0:
+      return std::make_pair<char, int>('0', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 1:
+      return std::make_pair<char, int>('1', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 2:
+      return std::make_pair<char, int>('2', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 3:
+      return std::make_pair<char, int>('3', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 4:
+      return std::make_pair<char, int>('4', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 5:
+      return std::make_pair<char, int>('6', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 6:
+      return std::make_pair<char, int>('7', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 7:
+      return std::make_pair<char, int>('8', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 8:
+      return std::make_pair<char, int>('9', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 9:
+      return std::make_pair<char, int>('B', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 10:
+      return std::make_pair<char, int>('C', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 11:
+      return std::make_pair<char, int>('D', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 12:
+      return std::make_pair<char, int>('E', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 13:
+      return std::make_pair<char, int>('G', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 14:
+      return std::make_pair<char, int>('H', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 15:
+      return std::make_pair<char, int>('J', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 16:
+      return std::make_pair<char, int>('K', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 17:
+      return std::make_pair<char, int>('L', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 18:
+      return std::make_pair<char, int>('R', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 19:
+      return std::make_pair<char, int>('S', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 20:
+      return std::make_pair<char, int>('T', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    default:
+      return std::make_pair<char, int>('\0', 0);
+  }
 }
 
 FoundNumber RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, const cv::Mat& original, number_data& stat_data) {
   FoundNumber result;
 
-  for (const auto& next : group) {
+  /*for (const auto& next : group) {
     const cv::Mat copy = etal(cv::Rect(next.left(), next.top(), next.width() + 1, next.height() + 1)).clone();
     const std::pair<char, int> rec_res = RecognizeSymbol(copy);
     result.m_number += rec_res.first;
@@ -600,7 +655,7 @@ FoundNumber RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, cons
     result.m_figs.push_back(next);
   }
 
-  assert(result.m_number.size() == group.size());
+  assert(result.m_number.size() == group.size());*/
 
   return result;
 }
@@ -1039,46 +1094,47 @@ std::pair<cv::Mat, std::vector<FigureGroup>> ParseToGroups(const cv::Mat& input,
 
 template<int stat_data_index>
 std::vector<FoundNumber> ReadNumberImpl(const cv::Mat& input, int gray_level, number_data& stat_data) {
-  const cv::Mat& gray_image = CreateGrayImage(input);
-  cv::Mat img_bw = gray_image > gray_level;
-
-  cv::Mat iii1 = img_bw.clone();
-  NiblackSauvolaWolfJolion(gray_image, iii1, WOLFJOLION, gray_level / 10, gray_level / 10, 0.05);
-//  cv::Mat iii2 = img_bw.clone();
-//  NiblackSauvolaWolfJolion(gray_image, iii2, WOLFJOLION, 7, 7, 0.1);
-//  cv::Mat iii3 = img_bw.clone();
-//  NiblackSauvolaWolfJolion(gray_image, iii3, WOLFJOLION, 7, 7, 0.15);
-
-
-  //ReplaceBlackWhite(img_bw); // конвертим для сингапура
-  //cv::Mat img_to_recog = img_bw.clone();
-  //FigureGroup figs = ParseToFigures<stat_data_index>(img_bw);
-
-  ReplaceBlackWhite(iii1); // конвертим для сингапура
-  cv::Mat img_to_recog = iii1.clone();
-  FigureGroup figs = ParseToFigures<stat_data_index>(iii1);
-
-//  cv::Mat mama = input.clone();
-//  DrawFigures(mama, figs);
-
-  // выкидываем слишком узкие штуки
-  RemoveTooNarrowFigures(figs);
-  std::vector<FigureGroup> groups = MakeGroupsByAngle(figs);
-  // удаляем лишнее по ширине
-  RemoteTooFarFromFirst(groups, 7, std::bind(&Figure::left, std::placeholders::_1));
-  // удаляем лишнее по длине
-  RemoteTooFarFromFirst(groups, 3, std::bind(&Figure::left, std::placeholders::_1));
-  // выкидываем элементы, не пропорциональные первому элементу
-  RemoveNotFitToFirstByHeight(groups);
-  // выкидываем группы, которые включаются в другие группы
-  RemoveIncludedGroups(groups);
-  // сливаем пересекающиеся группы
-  MergeIntersectsGroups(groups);
-  cv::Mat deb = input.clone();
-  DrawGroupsFigures(deb, groups, CV_RGB(255, 0, 0));
-  // ищем номера
-  const std::vector<FoundNumber> nums = RecognizeNumber(img_to_recog, groups, gray_image, stat_data);
-  return nums;
+  return std::vector<FoundNumber>();
+//  const cv::Mat& gray_image = CreateGrayImage(input);
+//  cv::Mat img_bw = gray_image > gray_level;
+//
+//  cv::Mat iii1 = img_bw.clone();
+//  NiblackSauvolaWolfJolion(gray_image, iii1, WOLFJOLION, gray_level / 10, gray_level / 10, 0.05);
+////  cv::Mat iii2 = img_bw.clone();
+////  NiblackSauvolaWolfJolion(gray_image, iii2, WOLFJOLION, 7, 7, 0.1);
+////  cv::Mat iii3 = img_bw.clone();
+////  NiblackSauvolaWolfJolion(gray_image, iii3, WOLFJOLION, 7, 7, 0.15);
+//
+//
+//  //ReplaceBlackWhite(img_bw); // конвертим для сингапура
+//  //cv::Mat img_to_recog = img_bw.clone();
+//  //FigureGroup figs = ParseToFigures<stat_data_index>(img_bw);
+//
+//  ReplaceBlackWhite(iii1); // конвертим для сингапура
+//  cv::Mat img_to_recog = iii1.clone();
+//  FigureGroup figs = ParseToFigures<stat_data_index>(iii1);
+//
+////  cv::Mat mama = input.clone();
+////  DrawFigures(mama, figs);
+//
+//  // выкидываем слишком узкие штуки
+//  RemoveTooNarrowFigures(figs);
+//  std::vector<FigureGroup> groups = MakeGroupsByAngle(figs);
+//  // удаляем лишнее по ширине
+//  RemoteTooFarFromFirst(groups, 7, std::bind(&Figure::left, std::placeholders::_1));
+//  // удаляем лишнее по длине
+//  RemoteTooFarFromFirst(groups, 3, std::bind(&Figure::left, std::placeholders::_1));
+//  // выкидываем элементы, не пропорциональные первому элементу
+//  RemoveNotFitToFirstByHeight(groups);
+//  // выкидываем группы, которые включаются в другие группы
+//  RemoveIncludedGroups(groups);
+//  // сливаем пересекающиеся группы
+//  MergeIntersectsGroups(groups);
+//  cv::Mat deb = input.clone();
+//  DrawGroupsFigures(deb, groups, CV_RGB(255, 0, 0));
+//  // ищем номера
+//  const std::vector<FoundNumber> nums = RecognizeNumber(img_to_recog, groups, gray_image, stat_data);
+//  return nums;
 }
 
 FoundNumber read_number_loop(const cv::Mat& input, const std::vector<int>& search_levels) {
@@ -1176,17 +1232,18 @@ std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const c
 
   // находим все фигуры
   std::vector<int> steps = {140, 150};
-/*  std::vector<int> steps;
-  const int kStepSize = 10;
-  for (int nn = 0; nn < 255;  nn += kStepSize) {
-    steps.push_back(nn);
-  }*/
+  //std::vector<int> steps;
+  //const int kStepSize = 10;
+  //for (int nn = 0; nn < 255;  nn += kStepSize) {
+  //  steps.push_back(nn);
+  //}
 
   std::vector<ParseToFigsResult> all_figs;
   for (int nn : steps) {
     all_figs.push_back(ParseToFigures(input, nn));
   }
 
+  // составляем группы с учетом символов с других уровней
   for (int nn : steps) {
     auto cur_lev_figs = std::find_if(begin(all_figs), end(all_figs), [nn](const ParseToFigsResult& other) -> bool { return other.level == nn; });
     assert(cur_lev_figs != end(all_figs));
@@ -1200,6 +1257,15 @@ std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const c
       if (next.group.size()) {
         result.push_back(next);
       }
+    }
+  }
+
+  // распоздаем символы в группах
+  for (ParseToGroupWithProcessingResult& next_group: result) {
+    for (const Figure& fig : next_group.group) {
+      std::pair<char, int> next_sym = RecognizeSymbol(next_group.img(fig.RectCV()).clone());
+      next_group.number += (next_sym.first == '\0' ? '?' : next_sym.first);
+      next_group.weights.push_back(next_sym.second);
     }
   }
 

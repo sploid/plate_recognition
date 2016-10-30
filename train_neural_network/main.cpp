@@ -128,7 +128,7 @@ int MakeTraining() {
     cv::Mat turu;
     mlp->predict(input.row(0), turu);
     {
-      cv::FileStorage fs(QCoreApplication::arguments().at(2).toLocal8Bit().data(), cv::FileStorage::WRITE);
+      cv::FileStorage fs(QCoreApplication::arguments().at(2).toLocal8Bit().data(), cv::FileStorage::WRITE|cv::FileStorage::FORMAT_XML);
       mlp->write(fs);
       fs.release();
     }
