@@ -13,21 +13,21 @@
 #include "utils.h"
 #include "figure.h"
 
-struct number_data
-{
-	number_data()
-		: m_cache_origin( 0 )
-	{
-	}
-	~number_data()
-	{
-	}
-	const cv::Mat* m_cache_origin;
-	std::map< std::pair< cv::Rect, bool >, std::pair< char, double > > m_cache_rets;
+cv::Ptr<cv::ml::ANN_MLP> gMLP;
+InitData gEngineData;
+
+struct number_data {
+  number_data()
+    : m_cache_origin(0) {
+  }
+  ~number_data() {
+  }
+  const cv::Mat* m_cache_origin;
+  std::map< std::pair< cv::Rect, bool >, std::pair< char, double > > m_cache_rets;
 
 private:
-	number_data( const number_data& other );
-	number_data& operator=( const number_data& other );
+  number_data( const number_data& other );
+  number_data& operator=( const number_data& other );
 };
 
 #define COUNT_GLOBAL_DATA 8
@@ -163,22 +163,10 @@ std::vector< pair_int > calc_syms_centers( int index, int angle, int first_fig_h
 }
 
 // надо сделать какую-то пропорцию для зависимости угла от расстояния
-bool AngleIsEqual(int an1, int an2) {
-  const int kAngleDiff = 16;
-  int an_max = an1 + kAngleDiff;
-  int an_min = an1 - kAngleDiff;
-  if (an_min >= 0 && an_max <= 360) {
-    const bool ret = an2 < an_max && an2 > an_min;
-    return ret;
-  } else if (an_min <= 0) {
-    an_min = an_min + 360;
-    return an2 < an_max || an2 > an_min;
-  } else if (an_max > 360) {
-    an_max = an_max - 360;
-    return an2 < an_max || an2 > an_min;
-  }
-  assert(false);
-  return false;
+bool AngleIsEqual(double an1, double an2) {
+  int diff = std::abs(static_cast<int>(std::max(an1, an2) - std::min(an1, an2)) % 360);
+  diff = std::min(diff, 360 - diff);
+  return diff <= gEngineData.sym_to_sym_max_angle;
 }
 
 std::pair< char, double > find_sym_nn( bool num, const Figure& fig, const cv::Mat& original, number_data& stat_data )
@@ -220,50 +208,42 @@ std::pair< char, double > find_sym_nn( bool num, const Figure& fig, const cv::Ma
 }
 
 // выбираем пиксели что бы получить контур, ограниченный белыми пикселями
-template< int stat_data_index >
-void add_pixel_as_spy( int row, int col, cv::Mat& mat, Figure& fig, int top_border = -1, int bottom_border = -1 )
-{
-//	time_mesure tm( "NEXT:" );
-	if ( top_border == -1 ) // верняя граница поиска
-	{
-		top_border = 0;
-	}
-	if ( bottom_border == -1 ) // нижняя граница поиска
-	{
-		bottom_border = mat.rows;
-	}
+template<int stat_data_index>
+void add_pixel_as_spy(int row, int col, cv::Mat& mat, Figure& fig, int top_border = -1, int bottom_border = -1) {
+//  time_mesure tm( "NEXT:" );
+  if (top_border == -1 ) {
+    top_border = 0;
+  }
+  if (bottom_border == -1) {
+    bottom_border = mat.rows;
+  }
 
-	g_points_count[ stat_data_index ] = 0;
-	g_points_dublicate_first[ stat_data_index ][ g_points_count[ stat_data_index ] ] = row;
-	g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = col;
+  g_points_count[stat_data_index] = 0;
+  g_points_dublicate_first[stat_data_index][g_points_count[stat_data_index]] = row;
+  g_points_dublicate_second[stat_data_index][g_points_count[stat_data_index]++] = col;
 
-	// что бы не зациклилось
-	mat.ptr< unsigned char >( row )[ col ] = 255;
-	int cur_index = 0;
-	while ( cur_index < g_points_count[ stat_data_index ] )
-	{
-		const int& cur_nn = g_points_dublicate_first[ stat_data_index ][ cur_index ];
-		const int& cur_mm = g_points_dublicate_second[ stat_data_index ][ cur_index ];
-		for ( size_t yy = 0; yy < sizeof( g_pix_around[ 0 ] ) / sizeof( g_pix_around[ 0 ][ 0 ] ); ++yy )
-		{
-			const int &curr_pix_first = g_pix_around[ stat_data_index ][ yy ].first + cur_nn;
-			const int &curr_pix_second = g_pix_around[ stat_data_index ][ yy ].second + cur_mm;
-			if ( curr_pix_first >= top_border && curr_pix_first < bottom_border
-				&& curr_pix_second >= 0 && curr_pix_second < mat.cols )
-			{
-				if ( mat.ptr< unsigned char >( curr_pix_first )[ curr_pix_second ] == 0 )
-				{
-					g_points_dublicate_first[ stat_data_index ][ g_points_count[ stat_data_index ] ] = curr_pix_first;
-					g_points_dublicate_second[ stat_data_index ][ g_points_count[ stat_data_index ]++ ] = curr_pix_second;
-					fig.add_point( pair_int( curr_pix_first, curr_pix_second ) );
-					// что бы не зациклилось
-					mat.ptr< unsigned char >( curr_pix_first )[ curr_pix_second ] = 255;
-				}
-			}
-		}
-		++cur_index;
-	}
-	assert( fig.is_empty() || fig.left() >= 0 );
+  // что бы не зациклилось
+  mat.ptr<unsigned char>(row)[col] = 255;
+  int cur_index = 0;
+  while (cur_index < g_points_count[stat_data_index]) {
+    const int& cur_nn = g_points_dublicate_first[stat_data_index][cur_index];
+    const int& cur_mm = g_points_dublicate_second[stat_data_index][cur_index];
+    for (size_t yy = 0; yy < sizeof(g_pix_around[0]) / sizeof(g_pix_around[0][0]); ++yy) {
+      const int &curr_pix_first = g_pix_around[stat_data_index][yy].first + cur_nn;
+      const int &curr_pix_second = g_pix_around[stat_data_index][yy].second + cur_mm;
+      if (curr_pix_first >= top_border && curr_pix_first < bottom_border && curr_pix_second >= 0 && curr_pix_second < mat.cols) {
+        if (mat.ptr<unsigned char>(curr_pix_first)[curr_pix_second] == 0) {
+          g_points_dublicate_first[stat_data_index][g_points_count[stat_data_index]] = curr_pix_first;
+          g_points_dublicate_second[stat_data_index][g_points_count[stat_data_index]++] = curr_pix_second;
+          fig.add_point(pair_int(curr_pix_first, curr_pix_second));
+          // что бы не зациклилось
+          mat.ptr<unsigned char>(curr_pix_first)[curr_pix_second] = 255;
+        }
+      }
+    }
+    ++cur_index;
+  }
+  assert(fig.is_empty() || fig.left() >= 0);
 }
 
 bool FigLessLeft(const Figure& lf, const Figure& rf) {
@@ -348,12 +328,22 @@ void MergeIntersectsGroups(std::vector<FigureGroup>& groups) {
   }
 }
 
-void RemoveToSmallGroups(std::vector<FigureGroup>& groups) {
-  for (int nn = static_cast<int>(groups.size()) - 1; nn >= 0; --nn) {
-    if (groups[nn].size() < kMinGroupSize) {
-      groups.erase( groups.begin() + nn );
+template<class Item, class Functor>
+void RemoveTooToo(std::vector<Item>& els, Functor fu) {
+  for (int nn = static_cast<int>(els.size()) - 1; nn >= 0; --nn) {
+    if (fu(els[nn]) < kMinGroupSize) {
+      els.erase(els.begin() + nn);
     }
   }
+}
+
+void RemoveToSmallGroups(std::vector<FigureGroup>& groups) {
+  RemoveTooToo(groups, [](const FigureGroup& fg) -> int { return static_cast<int>(fg.size()); });
+/*  for (int nn = static_cast<int>(groups.size()) - 1; nn >= 0; --nn) {
+    if (groups[nn].size() < kMinGroupSize) {
+      groups.erase(groups.begin() + nn);
+    }
+  }*/
 }
 
 // выкидываем элементы, что выходят за размеры номера относительно первого элемента
@@ -397,24 +387,25 @@ void RemoveNotFitToFirstByHeight(std::vector<FigureGroup>& groups) {
 }
 
 // проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
-bool IsFigFitToGroupAngle(const Figure& fig, const FigureGroup& group, int group_angle) {
-  for (size_t yy = 1; yy < group.size(); ++yy) {
+bool IsFigFitToGroupAngle(const Figure& fig, const FigureGroup& group, double group_angle) {
+  std::stringstream ss;
+  ss << "fit to gr " << group_angle;
+  for (size_t yy = 0; yy < group.size(); ++yy) {
     const Figure& next_fig = group.at(yy);
     double angle_to_fig = 0.;
     if (fig.left() > next_fig.left()) {
-      angle_to_fig = 57.2957795 * atan2(static_cast<double>(fig.left() - next_fig.left()), static_cast<double>(fig.bottom() - next_fig.bottom()));
+      angle_to_fig = next_fig.AngleTo(fig);// 57.2957795 * atan2(static_cast<double>(fig.left() - next_fig.left()), static_cast<double>(fig.bottom() - next_fig.bottom()));
     } else {
-      angle_to_fig = 57.2957795 * atan2(static_cast<double>(next_fig.left() - fig.left()), static_cast<double>(next_fig.bottom() - fig.bottom()));
+      angle_to_fig = fig.AngleTo(next_fig);// 57.2957795 * atan2(static_cast<double>(next_fig.left() - fig.left()), static_cast<double>(next_fig.bottom() - fig.bottom()));
     }
-    if (!AngleIsEqual(static_cast<int>(group_angle), static_cast<int>(angle_to_fig))) {
+    ss << " " << angle_to_fig;
+    if (!AngleIsEqual(group_angle, angle_to_fig)) {
       return false;
     }
   }
+  ss << std::endl;
+  OutputDebugStringA(ss.str().c_str());
   return true;
-}
-
-double CalculateAngle(const Figure& fig_left, const Figure& fig_right) {
-  return 57.2957795 * atan2(static_cast<double>(fig_left.left() - fig_right.left()), static_cast<double>(fig_left.bottom() - fig_right.bottom()));
 }
 
 // подсчитываем средний угол в группе
@@ -423,12 +414,12 @@ double CalculateAngle(const FigureGroup& group) {
   double result = 0.;
   size_t count = 0;
   for (size_t nn = 0; nn < group.size() - 1; ++nn) {
-    for (size_t mm = nn + 1; mm < group.size(); ++mm) {
-      result += CalculateAngle(group[mm], group[nn]);
+//    for (size_t mm = nn + 1; mm < group.size(); ++mm) {
+      result += group[nn].AngleTo(group[nn + 1]);
       ++count;
-    }
+//    }
   }
-  return result / count;
+  return result / static_cast<double>(count);
 }
 
 // по отдельным фигурам создаем группы фигур
@@ -444,10 +435,10 @@ std::vector<FigureGroup> MakeGroupsByAngle(std::vector<Figure>& figs) {
         const Figure& fig_to_add = figs[mm];
         if (fig_to_add.left() > figs[nn].left()) {
 	  // угол между левыми-нижними углами фигуры
-	  const double angle = CalculateAngle(fig_to_add, figs[nn]);
+	  const double angle = figs[nn].AngleTo(fig_to_add);
           std::vector<std::pair<double, FigureGroup>>::iterator cur_gr_iter = std::find_if(begin(cur_fig_groups), end(cur_fig_groups), [angle, fig_to_add](const std::pair<double, FigureGroup>& next_val) -> bool {
-            return AngleIsEqual(static_cast<int>(next_val.first), static_cast<int>(angle))
-                && IsFigFitToGroupAngle(fig_to_add, next_val.second, static_cast<int>(next_val.first));
+            return AngleIsEqual(next_val.first, angle)
+                && IsFigFitToGroupAngle(fig_to_add, next_val.second, next_val.first);
           });
 
           if (cur_gr_iter != end(cur_fig_groups)) {
@@ -584,18 +575,21 @@ std::vector< found_symbol > figs_search_syms( const std::vector< pair_int >& pis
 	return ret;
 }
 
+void InitEngine(const InitData& data) {
+  gEngineData = data;
+  if (!gMLP) {
+    gMLP = cv::ml::ANN_MLP::create();
+    cv::FileStorage fs(data.mlp_train_path.c_str(), cv::FileStorage::READ | cv::FileStorage::FORMAT_XML);
+    gMLP->read(fs.root());
+    fs.release();
+  }
+}
+
 // @todo (sploid): refactor for support output with several symbols
 std::pair<char, int> RecognizeSymbol(const cv::Mat& img) {
-  static cv::Ptr<cv::ml::ANN_MLP> mlp;
-  if (!mlp) {
-    mlp = cv::ml::ANN_MLP::create();
-    cv::FileStorage fs("C:\\cache\\sing\\all_syms_train.xml", cv::FileStorage::READ | cv::FileStorage::FORMAT_XML);
-    mlp->read(fs.root());
-  }
-
   cv::Mat to_pred = convert_to_row(img);
   cv::Mat to_out;
-  const int pred_result = static_cast<int>(mlp->predict(to_pred, to_out));
+  const int pred_result = static_cast<int>(gMLP->predict(to_pred, to_out));
   switch (pred_result) {
     case 0:
       return std::make_pair<char, int>('0', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
@@ -645,7 +639,11 @@ std::pair<char, int> RecognizeSymbol(const cv::Mat& img) {
 }
 
 FoundNumber RecognizeNumberByGroup(cv::Mat& etal, const FigureGroup& group, const cv::Mat& original, number_data& stat_data) {
-  FoundNumber result;
+  (void)etal;
+  (void)group;
+  (void)original;
+  (void)stat_data;
+    FoundNumber result;
 
   /*for (const auto& next : group) {
     const cv::Mat copy = etal(cv::Rect(next.left(), next.top(), next.width() + 1, next.height() + 1)).clone();
@@ -739,11 +737,9 @@ FigureGroup ParseToFigures(cv::Mat& mat) {
         add_pixel_as_spy<stat_data_index>(nn, mm, mat, fig_to_create);
         if (fig_to_create.is_too_big()) {
            // проверяем что высота больше ширины
-          if (fig_to_create.width() < fig_to_create.height()) {
-            if (fig_to_create.width() > 1) {
-//              if (fig_to_create.height() / fig_to_create.width() < 4) {
-                ret.push_back(fig_to_create);
-///	      }
+          if (static_cast<double>(fig_to_create.height()) / static_cast<double>(fig_to_create.width()) > gEngineData.symbol_hei_to_wid_max_koef) {
+            if (fig_to_create.width() > 1 && fig_to_create.height() >= gEngineData.min_height) {
+              ret.push_back(fig_to_create);
 	    }
           }
         }
@@ -857,8 +853,8 @@ void ReplaceBlackWhite(cv::Mat& input) {
 void RemoveTooNarrowFigures(FigureGroup& figs) {
   for (int nn = static_cast<int>(figs.size() - 1); nn >= 0; --nn) {
     assert(figs.at(nn).width() && figs.at(nn).height());
-    const float diff = static_cast<float>(figs.at(nn).width()) / static_cast<float>(figs.at(nn).height());
-    const float kMinDiff = 0.1;
+    const double diff = static_cast<double>(figs.at(nn).width()) / static_cast<double>(figs.at(nn).height());
+    const double kMinDiff = 0.1;
     if (diff < kMinDiff) {
       figs.erase(figs.begin() + nn);
     }
@@ -869,10 +865,8 @@ ParseToFigsResult ParseToFigures(const cv::Mat& input, int level) {
   ParseToFigsResult result;
   result.level = level;
   cv::Mat gray_image = CreateGrayImage(input);
-//  cv::Mat wolf_out = gray_image.clone();
-//  NiblackSauvolaWolfJolion(gray_image, wolf_out, WOLFJOLION, next_level, next_level, k);
   cv::Mat wolf_out = gray_image > level;
-  ReplaceBlackWhite(wolf_out); // конвертим для сингапура
+//  ReplaceBlackWhite(wolf_out); // конвертим для сингапура
   result.bin_image = wolf_out.clone();
   result.figs = ParseToFigures<0>(wolf_out);
   // выкидываем слишком узкие штуки
@@ -1057,17 +1051,19 @@ std::vector<FigureGroup> ProcessFoundGroups(int curr_level, cv::Mat& input_mat, 
   return result;
 }
 
-std::vector<FigureGroup> MakeGroups(const FigureGroup& figs) {
-  FigureGroup figs_clone(figs);
-  std::vector<FigureGroup> groups = MakeGroupsByAngle(figs_clone);
+std::vector<FigureGroup> MakeGroups(FigureGroup figs) {
+  std::vector<FigureGroup> groups = MakeGroupsByAngle(figs);
+  if (groups.size() == 0) {
+    return groups;
+  }
 
-  /*  for (int nn = 0; nn < groups.size(); ++nn) {
-  cv::Mat ccc = result.first.clone();
-  cv::Mat kkk;
-  cvtColor(ccc, kkk, CV_GRAY2RGB);
-  std::vector<FigureGroup> cur;
-  cur.push_back(groups.at(nn));
-  DrawGroupsFigures(kkk, cur, CV_RGB(255, 0, 0));
+/*  for (int nn = 0; nn < groups.size(); ++nn) {
+    cv::Mat ccc = result.first.clone();
+    cv::Mat kkk;
+    cvtColor(ccc, kkk, CV_GRAY2RGB);
+    std::vector<FigureGroup> cur;
+    cur.push_back(groups.at(nn));
+    DrawGroupsFigures(kkk, cur, CV_RGB(255, 0, 0));
   }*/
   // удаляем лишнее по ширине
   RemoteTooFarFromFirst(groups, kMaxDistByX, std::bind(&Figure::left, std::placeholders::_1));
@@ -1094,6 +1090,9 @@ std::pair<cv::Mat, std::vector<FigureGroup>> ParseToGroups(const cv::Mat& input,
 
 template<int stat_data_index>
 std::vector<FoundNumber> ReadNumberImpl(const cv::Mat& input, int gray_level, number_data& stat_data) {
+  (void)input;
+  (void)gray_level;
+  (void)stat_data;
   return std::vector<FoundNumber>();
 //  const cv::Mat& gray_image = CreateGrayImage(input);
 //  cv::Mat img_bw = gray_image > gray_level;
@@ -1228,25 +1227,34 @@ FoundNumber read_number_loop(const cv::Mat& input, const std::vector<int>& searc
 }
 
 std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const cv::Mat& input) {
-  std::vector<ParseToGroupWithProcessingResult> result;
-
+  std::vector<ParseToGroupWithProcessingResult> found_groups;
   // находим все фигуры
-  std::vector<int> steps = {140, 150};
-  //std::vector<int> steps;
-  //const int kStepSize = 10;
-  //for (int nn = 0; nn < 255;  nn += kStepSize) {
-  //  steps.push_back(nn);
-  //}
+//  std::vector<int> steps = {140, 150};
+//  std::vector<int> steps = {150};
+  std::vector<int> steps;
+  const int kStepSize = 10;
+  for (int nn = 0; nn < 255;  nn += kStepSize) {
+    steps.push_back(nn);
+  }
 
   std::vector<ParseToFigsResult> all_figs;
   for (int nn : steps) {
-    all_figs.push_back(ParseToFigures(input, nn));
+    const ParseToFigsResult ptfr = ParseToFigures(input, nn);
+    if (!ptfr.figs.empty()) {
+      all_figs.push_back(ptfr);
+      cv::Mat out = input.clone();
+      DrawFigures(out, ptfr.figs);
+      int t = 0;
+    }
   }
+
 
   // составляем группы с учетом символов с других уровней
   for (int nn : steps) {
     auto cur_lev_figs = std::find_if(begin(all_figs), end(all_figs), [nn](const ParseToFigsResult& other) -> bool { return other.level == nn; });
-    assert(cur_lev_figs != end(all_figs));
+    if (cur_lev_figs == end(all_figs)) {
+      continue;
+    }
     const std::vector<FigureGroup> parsed_groups = MakeGroups(cur_lev_figs->figs);
     const std::vector<FigureGroup> process_groups = ProcessFoundGroups(nn, cur_lev_figs->bin_image, parsed_groups, all_figs);
     for (size_t mm = 0; mm < process_groups.size(); ++mm) {
@@ -1255,19 +1263,79 @@ std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const c
       next.level = nn;
       next.group = process_groups.at(mm);
       if (next.group.size()) {
-        result.push_back(next);
+        found_groups.push_back(next);
       }
     }
   }
 
   // распоздаем символы в группах
-  for (ParseToGroupWithProcessingResult& next_group: result) {
+  for (ParseToGroupWithProcessingResult& next_group : found_groups) {
     for (const Figure& fig : next_group.group) {
-      std::pair<char, int> next_sym = RecognizeSymbol(next_group.img(fig.RectCV()).clone());
-      next_group.number += (next_sym.first == '\0' ? '?' : next_sym.first);
-      next_group.weights.push_back(next_sym.second);
+      cv::Mat to_sym_recog = next_group.img(fig.RectCV()).clone();
+      std::pair<char, int> next_sym = RecognizeSymbol(to_sym_recog);
+      next_group.AddSymbol(next_sym.first == '\0' ? '?' : next_sym.first, next_sym.second);
     }
   }
+
+  auto is_intercepted = [](const ParseToGroupWithProcessingResult& lh, const ParseToGroupWithProcessingResult& rh) -> bool {
+    for (const Figure& first : lh.group) {
+      if (IsIntersect(first, rh.group)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // ищем пересечения групп на разных уровнях
+  std::vector<ParseToGroupWithProcessingResult> result;
+  while (!found_groups.empty()) {
+    std::vector<ParseToGroupWithProcessingResult> all_intercepted;
+    all_intercepted.push_back(found_groups.front());
+    found_groups.erase(begin(found_groups));
+    for (int nn = static_cast<int>(found_groups.size()) - 1; nn >= 0; --nn) {
+      for (int mm = 0; mm < static_cast<int>(all_intercepted.size()); ++mm) {
+        if (is_intercepted(found_groups.at(nn), all_intercepted.at(mm))) {
+          all_intercepted.push_back(found_groups.at(nn));
+          found_groups.erase(begin(found_groups) + nn);
+          break;
+        }
+      }
+    }
+    auto best_element = max_element(begin(all_intercepted), end(all_intercepted));
+
+    result.push_back(*best_element);
+  }
+
+  // рвем группы
+  bool cuted = true;
+  while (cuted) {
+    cuted = false;
+    for (size_t nn = 0; nn < result.size(); ++nn) {
+      const int everage_width = accumulate(begin(result.at(nn).group), end(result.at(nn).group), 0, [](int prev, const Figure& fig)->int{ return prev + fig.RectCV().width; }) / static_cast<int>(result.at(nn).group.size());
+      const int max_wid = everage_width * 3;
+      for (size_t mm = 0; mm < result.at(nn).group.size() - 1; ++mm) {
+        const Figure& from = result.at(nn).group.at(mm);
+        const Figure& to = result.at(nn).group.at(mm + 1);
+        if (to.left() - from.right() > max_wid) {
+          // рвем
+          const ParseToGroupWithProcessingResult new_group = result[nn].Cut(static_cast<int>(mm) + 1);
+          result.push_back(new_group);
+          cuted = true;
+          break;
+        }
+      }
+      if (cuted) {
+        break;
+      }
+    }
+  }
+
+  RemoveTooToo(result, [] (const ParseToGroupWithProcessingResult& pr) -> int { return static_cast<int>(pr.group.size());} );
+
+  sort(begin(result), end(result));
+  reverse(begin(result), end(result));
+//  result.erase(remove_if(begin(result), end(result), [](const ParseToGroupWithProcessingResult& res)->bool { return res.number.size() <= 6 || res.number.size() >= 10; }), end(result));
+
 
   return result;
 }

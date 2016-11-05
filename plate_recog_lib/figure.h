@@ -27,6 +27,10 @@ public:
       bottom_(bottom) {
   }
 
+  double AngleTo(const Figure& other) const {
+    return 57.2957795 * atan2(static_cast<double>(CenterCV().x - other.CenterCV().x), static_cast<double>(CenterCV().y - other.CenterCV().y));
+  }
+
   int width() const {
     assert(!is_empty() && left_ <= right_);
     return right_ - left_ + 1;
@@ -62,9 +66,9 @@ public:
       bottom_ = val.first;
     }
 
-    if (right_ - left_ > 50) {
+/*    if (right_ - left_ > 50) {
       m_too_big = true;
-    }
+    }*/
   }
 
   cv::Point2i CenterCV() const {

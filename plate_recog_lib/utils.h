@@ -122,6 +122,11 @@ inline QImage mat2qimage(const cv::Mat& mat, const QRect& rect = QRect()) {
     const QImage ret(static_cast<const uchar*>(dest.ptr()), width, height, dest.step, QImage::Format_RGB888);
     return ret.rgbSwapped();
 
+  } else if (dest.depth() == CV_MAT_DEPTH(CV_8U) && dest.channels() == 4) {
+    const QImage ret(static_cast<const uchar*>(dest.ptr()), width, height, dest.step, QImage::Format_RGBA8888);
+    return ret;
+//    return ret.rgbSwapped();
+
   } else if (dest.depth() == CV_MAT_DEPTH(CV_8U) && dest.channels() == 1) {
     QImage ret(width, height, QImage::Format_RGB32);
     for(int nn = 0; nn < height; ++nn) {

@@ -1,4 +1,6 @@
 #pragma once
+#include <iterator>
+#include <numeric>
 #include <string>
 #include <vector>
 #include <utility>
@@ -65,13 +67,52 @@ std::vector<ParseToFigsResult> ParseToFigures(const cv::Mat& input, const std::v
 std::pair<cv::Mat, std::vector<FigureGroup>> ParseToGroups(const cv::Mat& input, int level);
 std::vector<FigureGroup> ProcessFoundGroups(int curr_level, cv::Mat& input_mat, const std::vector<FigureGroup>& input_groups, const std::vector<ParseToFigsResult>& other_figs);
 
+template<class T>
+void CopyAndRemove(T& from, T& to, int index) {
+  copy(begin(from) + index, end(from), back_inserter(to));
+  from.erase(begin(from) + index, end(from));
+}
+
 struct ParseToGroupWithProcessingResult {
   cv::Mat img;
-  int level;
+  int level = 0;
   FigureGroup group;
   std::string number;
-  std::vector<int> weights;
+
+  int Weight() const {
+    return std::accumulate(begin(weights_), end(weights_), 0);
+  }
+
+  bool operator<(const ParseToGroupWithProcessingResult& other) const {
+    return Weight() < other.Weight();
+  }
+
+  void AddSymbol(char sym, int weight) {
+    number += sym;
+    weights_.push_back(weight);
+  }
+
+  ParseToGroupWithProcessingResult Cut(int from) {
+    ParseToGroupWithProcessingResult result;
+    result.img = img;
+    result.level = level;
+    CopyAndRemove(group, result.group, from);
+    CopyAndRemove(number, result.number, from);
+    CopyAndRemove(weights_, result.weights_, from);
+    return result;
+  }
+
+private:
+  std::vector<int> weights_;
 };
 
 std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const cv::Mat& input);
+
+struct InitData {
+  std::string mlp_train_path;
+  double symbol_hei_to_wid_max_koef;
+  double sym_to_sym_max_angle;
+  int min_height;
+};
+void InitEngine(const InitData& data);
 
