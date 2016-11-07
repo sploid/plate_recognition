@@ -388,8 +388,6 @@ void RemoveNotFitToFirstByHeight(std::vector<FigureGroup>& groups) {
 
 // проверяем что бы угол был такой же как и у всех елементов группы, что бы не было дуги или круга
 bool IsFigFitToGroupAngle(const Figure& fig, const FigureGroup& group, double group_angle) {
-  std::stringstream ss;
-  ss << "fit to gr " << group_angle;
   for (size_t yy = 0; yy < group.size(); ++yy) {
     const Figure& next_fig = group.at(yy);
     double angle_to_fig = 0.;
@@ -398,13 +396,10 @@ bool IsFigFitToGroupAngle(const Figure& fig, const FigureGroup& group, double gr
     } else {
       angle_to_fig = fig.AngleTo(next_fig);// 57.2957795 * atan2(static_cast<double>(next_fig.left() - fig.left()), static_cast<double>(next_fig.bottom() - fig.bottom()));
     }
-    ss << " " << angle_to_fig;
     if (!AngleIsEqual(group_angle, angle_to_fig)) {
       return false;
     }
   }
-  ss << std::endl;
-  OutputDebugStringA(ss.str().c_str());
   return true;
 }
 
@@ -737,7 +732,7 @@ FigureGroup ParseToFigures(cv::Mat& mat) {
         add_pixel_as_spy<stat_data_index>(nn, mm, mat, fig_to_create);
         if (fig_to_create.is_too_big()) {
            // проверяем что высота больше ширины
-          if (static_cast<double>(fig_to_create.height()) / static_cast<double>(fig_to_create.width()) > gEngineData.symbol_hei_to_wid_max_koef) {
+          if (static_cast<double>(fig_to_create.width()) / static_cast<double>(fig_to_create.height()) < gEngineData.symbol_wid_to_hei_max_koef) {
             if (fig_to_create.width() > 1 && fig_to_create.height() >= gEngineData.min_height) {
               ret.push_back(fig_to_create);
 	    }
@@ -866,7 +861,9 @@ ParseToFigsResult ParseToFigures(const cv::Mat& input, int level) {
   result.level = level;
   cv::Mat gray_image = CreateGrayImage(input);
   cv::Mat wolf_out = gray_image > level;
-//  ReplaceBlackWhite(wolf_out); // конвертим для сингапура
+  if (gEngineData.plate_format == InitData::PlateFormat::SINGAPORE_WHITE_ON_BLACK) {
+    ReplaceBlackWhite(wolf_out); // конвертим для сингапура
+  }
   result.bin_image = wolf_out.clone();
   result.figs = ParseToFigures<0>(wolf_out);
   // выкидываем слишком узкие штуки
@@ -1242,9 +1239,6 @@ std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const c
     const ParseToFigsResult ptfr = ParseToFigures(input, nn);
     if (!ptfr.figs.empty()) {
       all_figs.push_back(ptfr);
-      cv::Mat out = input.clone();
-      DrawFigures(out, ptfr.figs);
-      int t = 0;
     }
   }
 
@@ -1334,8 +1328,7 @@ std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const c
 
   sort(begin(result), end(result));
   reverse(begin(result), end(result));
-//  result.erase(remove_if(begin(result), end(result), [](const ParseToGroupWithProcessingResult& res)->bool { return res.number.size() <= 6 || res.number.size() >= 10; }), end(result));
-
+  result.erase(remove_if(begin(result), end(result), [](const ParseToGroupWithProcessingResult& res)->bool { return res.number.size() > gEngineData.max_count_of_symbols; }), end(result));
 
   return result;
 }

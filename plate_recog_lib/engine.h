@@ -109,10 +109,18 @@ private:
 std::vector<ParseToGroupWithProcessingResult> ParseToGroupWithProcessing(const cv::Mat& input);
 
 struct InitData {
-  std::string mlp_train_path;
-  double symbol_hei_to_wid_max_koef;
+  enum class PlateFormat {
+    EURO_BLACK_ON_WHITE,
+    SINGAPORE_WHITE_ON_BLACK
+  };
+
+
+  std::string mlp_train_path; ///< path to trained MLP neural network
+  double symbol_wid_to_hei_max_koef; ///< максимальное отношение ширины к высоте
   double sym_to_sym_max_angle;
   int min_height;
+  int max_count_of_symbols;
+  PlateFormat plate_format;
 };
 void InitEngine(const InitData& data);
 

@@ -88,7 +88,7 @@ public:
   }
 
   std::pair<int, int> top_left() const {
-    return std::make_pair( left(), top() );
+    return std::make_pair(left(), top());
   }
 
   int left() const {
