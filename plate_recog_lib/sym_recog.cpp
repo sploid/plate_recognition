@@ -143,34 +143,6 @@ char index_to_char_char( int index )
 	}
 }
 
-std::vector< char > all_symbols()
-{
-	std::vector< char > ret;
-	ret.push_back( '0' );
-	ret.push_back( '1' );
-	ret.push_back( '2' );
-	ret.push_back( '3' );
-	ret.push_back( '4' );
-	ret.push_back( '5' );
-	ret.push_back( '6' );
-	ret.push_back( '7' );
-	ret.push_back( '8' );
-	ret.push_back( '9' );
-	ret.push_back( 'A' );
-	ret.push_back( 'B' );
-	ret.push_back( 'C' );
-	ret.push_back( 'E' );
-	ret.push_back( 'H' );
-	ret.push_back( 'K' );
-	ret.push_back( 'M' );
-	ret.push_back( 'O' );
-	ret.push_back( 'P' );
-	ret.push_back( 'T' );
-	ret.push_back( 'X' );
-	ret.push_back( 'Y' );
-	return ret;
-}
-
 typedef char (*index_to_char_func)( int );
 
 double predict_min_diff( const cv::Mat& pred_out, int max_val )

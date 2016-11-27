@@ -585,51 +585,40 @@ std::pair<char, int> RecognizeSymbol(const cv::Mat& img) {
   cv::Mat to_pred = convert_to_row(img);
   cv::Mat to_out;
   const int pred_result = static_cast<int>(gMLP->predict(to_pred, to_out));
+
   switch (pred_result) {
-    case 0:
-      return std::make_pair<char, int>('0', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 1:
-      return std::make_pair<char, int>('1', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 2:
-      return std::make_pair<char, int>('2', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 3:
-      return std::make_pair<char, int>('3', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 4:
-      return std::make_pair<char, int>('4', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 5:
-      return std::make_pair<char, int>('6', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 6:
-      return std::make_pair<char, int>('7', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 7:
-      return std::make_pair<char, int>('8', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 8:
-      return std::make_pair<char, int>('9', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 9:
-      return std::make_pair<char, int>('B', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 10:
-      return std::make_pair<char, int>('C', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 11:
-      return std::make_pair<char, int>('D', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 12:
-      return std::make_pair<char, int>('E', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 13:
-      return std::make_pair<char, int>('G', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 14:
-      return std::make_pair<char, int>('H', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 15:
-      return std::make_pair<char, int>('J', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 16:
-      return std::make_pair<char, int>('K', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 17:
-      return std::make_pair<char, int>('L', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 18:
-      return std::make_pair<char, int>('R', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 19:
-      return std::make_pair<char, int>('S', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    case 20:
-      return std::make_pair<char, int>('T', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
-    default:
-      return std::make_pair<char, int>('\0', 0);
+    case 0:   return std::make_pair<char, int>('0', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 1:   return std::make_pair<char, int>('1', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 2:   return std::make_pair<char, int>('2', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 3:   return std::make_pair<char, int>('3', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 4:   return std::make_pair<char, int>('4', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 5:   return std::make_pair<char, int>('5', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 6:   return std::make_pair<char, int>('6', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 7:   return std::make_pair<char, int>('7', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 8:   return std::make_pair<char, int>('8', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 9:   return std::make_pair<char, int>('9', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 10:  return std::make_pair<char, int>('A', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 11:  return std::make_pair<char, int>('B', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 12:  return std::make_pair<char, int>('C', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 13:  return std::make_pair<char, int>('D', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 14:  return std::make_pair<char, int>('E', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 15:  return std::make_pair<char, int>('F', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 16:  return std::make_pair<char, int>('G', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 17:  return std::make_pair<char, int>('H', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 18:  return std::make_pair<char, int>('J', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 19:  return std::make_pair<char, int>('K', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 20:  return std::make_pair<char, int>('L', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 21:  return std::make_pair<char, int>('M', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 22:  return std::make_pair<char, int>('P', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 23:  return std::make_pair<char, int>('R', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 24:  return std::make_pair<char, int>('S', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 25:  return std::make_pair<char, int>('T', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 26:  return std::make_pair<char, int>('U', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 27:  return std::make_pair<char, int>('V', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 28:  return std::make_pair<char, int>('W', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 29:  return std::make_pair<char, int>('X', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    case 30:  return std::make_pair<char, int>('30', static_cast<int>(to_out.at<float>(0, pred_result) * 1000));
+    default:  return std::make_pair<char, int>('\0', 0);
   }
 }
 

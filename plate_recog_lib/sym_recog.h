@@ -26,5 +26,3 @@ void init_recognizer();
 //const std::set< std::string >& region_codes();
 // set folder for output symbols
 void set_output_symbol_folder(const std::string& folder);
-// return all symbols
-std::vector<char> all_symbols();
